@@ -1,0 +1,5 @@
+export { TransformGizmo, type TransformGizmoOptions } from './TransformGizmo'
+export { defaultTheme, mergeTheme, type GizmoTheme, type PartialTheme } from './theme'
+export type { AxisId, GizmoMode, GizmoSpace } from './types'
+export { computeAnchoredScale, parseScaleHandle } from './core/ExtrudeMath'
+export { snapAngle, snapScale, snapTranslate } from './core/Snapping'
