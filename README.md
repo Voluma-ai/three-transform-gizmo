@@ -69,6 +69,7 @@ gizmo.setTheme({ colors: { sector: 0x56ccf2 } }) // partial update at runtime
 | `setTranslationSnap/RotationSnap/ScaleSnap()` | ✅ | |
 | `size`, `enabled`, `showX/Y/Z` | ✅ | |
 | `dragging`, `axis` (readonly) | ✅ | scale axes are signed: `'+X'`, `'-XY'`, … |
+| `getRaycaster()`, `reset()` | ✅ | `reset()` cancels the active drag and restores the start transform |
 | events `change`, `objectChange`, `dragging-changed`, `mouseDown`, `mouseUp` | ✅ | same names/payloads; extra `hoveron`/`hoveroff` |
 | `getHelper()` | — | the gizmo *is* an `Object3D`; add it to the scene directly |
 | `setTheme(partial)`, `getTheme()` | ➕ | extension |

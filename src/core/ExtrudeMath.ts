@@ -86,8 +86,9 @@ export function computeAnchoredScale(input: AnchoredScaleInput): AnchoredScaleRe
     const d = input.offsetWorld.dot(_u)
     const h0 = input.handleDistanceWorld
     const s = Math.max(1e-4, (h0 + d) / h0)
-    const newAxisScale = snapScale(input.scaleStart[a] * s, input.scaleSnap)
-    const effectiveRatio = newAxisScale / input.scaleStart[a]
+    const startAxisScale = Math.abs(input.scaleStart[a]) < 1e-10 ? 1e-10 : input.scaleStart[a]
+    const newAxisScale = snapScale(startAxisScale * s, input.scaleSnap)
+    const effectiveRatio = newAxisScale / startAxisScale
     scale[a] = newAxisScale
 
     if (!input.centerAnchored) {

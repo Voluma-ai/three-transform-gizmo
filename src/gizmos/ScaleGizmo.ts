@@ -43,20 +43,21 @@ export class ScaleGizmo extends ModeGizmo {
 
     for (const { letter, rot, dir } of AXES) {
       const L = letter.toUpperCase()
-      // shaft spanning the full axis through the center
-      const shaft = makeHandle(
-        new CylinderGeometry(t.sizes.axisLineRadius, t.sizes.axisLineRadius, d * 2 - t.sizes.scaleCubeSize, 8),
-        colors[letter],
-        'scale',
-        `+${L}` as AxisId,
-        t,
-      )
-      shaft.rotation.copy(rot)
-      shaft.userData.handle.axis = `+${L}` as AxisId // visual only; tint follows +side
-      this.visual.add(shaft)
-
       for (const sign of [1, -1]) {
         const axis = `${sign > 0 ? '+' : '-'}${L}` as AxisId
+
+        // half shaft from center to this side's handle, tinted with its handle
+        const shaft = makeHandle(
+          new CylinderGeometry(t.sizes.axisLineRadius, t.sizes.axisLineRadius, d - t.sizes.scaleCubeSize / 2, 8),
+          colors[letter],
+          'scale',
+          axis,
+          t,
+        )
+        shaft.rotation.copy(rot)
+        shaft.position.copy(dir).multiplyScalar((sign * (d - t.sizes.scaleCubeSize / 2)) / 2)
+        this.visual.add(shaft)
+
         const cube = makeHandle(geo.cube(t), colors[letter], 'scale', axis, t)
         cube.position.copy(dir).multiplyScalar(d * sign)
         cube.rotation.copy(rot)

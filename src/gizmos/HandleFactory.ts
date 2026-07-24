@@ -18,8 +18,8 @@ export interface HandleMesh extends Mesh<BufferGeometry, MeshBasicMaterial> {
   userData: { handle: { mode: GizmoMode; axis: AxisId; baseColor: number; baseOpacity: number; picker: boolean } }
 }
 
-export function gizmoMaterial(color: number, opacity: number, renderOrder: number): MeshBasicMaterial {
-  const m = new MeshBasicMaterial({
+export function gizmoMaterial(color: number, opacity: number): MeshBasicMaterial {
+  return new MeshBasicMaterial({
     color,
     transparent: true,
     opacity,
@@ -29,8 +29,6 @@ export function gizmoMaterial(color: number, opacity: number, renderOrder: numbe
     fog: false,
     toneMapped: false,
   })
-  void renderOrder
-  return m
 }
 
 export function pickerMaterial(): MeshBasicMaterial {
@@ -53,8 +51,11 @@ export function makeHandle(
   theme: GizmoTheme,
   picker = false,
 ): HandleMesh {
-  const mesh = new Mesh(geometry, picker ? pickerMaterial() : gizmoMaterial(color, theme.opacity.idle, theme.renderOrder)) as HandleMesh
-  mesh.renderOrder = theme.renderOrder + (picker ? 1 : 0)
+  const mesh = new Mesh(geometry, picker ? pickerMaterial() : gizmoMaterial(color, theme.opacity.idle)) as HandleMesh
+  mesh.renderOrder = theme.renderOrder
+  // pickers are never rendered; the raycaster is given them explicitly, which
+  // works regardless of visibility
+  if (picker) mesh.visible = false
   mesh.userData = { handle: { mode, axis, baseColor: color, baseOpacity: 1, picker } }
   return mesh
 }

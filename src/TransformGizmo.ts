@@ -3,6 +3,7 @@ import {
   Camera,
   Matrix4,
   Object3D,
+  Object3DEventMap,
   Plane,
   Quaternion,
   Raycaster,
@@ -10,17 +11,17 @@ import {
   Vector3,
 } from 'three'
 import { getDragPlane, intersectPlane } from './core/DragPlane'
-import { computeAnchoredScale, parseScaleHandle } from './core/ExtrudeMath'
+import { computeAnchoredScale } from './core/ExtrudeMath'
 import { screenScaleFactor } from './core/ScreenScale'
-import { snapAngle, snapTranslate } from './core/Snapping'
+import { snapAngle } from './core/Snapping'
 import { AngleSector } from './gizmos/AngleSector'
 import type { HandleMesh } from './gizmos/HandleFactory'
-import type { ModeGizmo } from './gizmos/ModeGizmo'
+import { ModeGizmo } from './gizmos/ModeGizmo'
 import { RotateGizmo } from './gizmos/RotateGizmo'
 import { ScaleGizmo } from './gizmos/ScaleGizmo'
 import { TranslateGizmo } from './gizmos/TranslateGizmo'
 import { defaultTheme, mergeTheme, type GizmoTheme, type PartialTheme } from './theme'
-import type { AxisId, GizmoMode, GizmoSpace } from './types'
+import type { AxisId, GizmoEventMap, GizmoMode, GizmoSpace } from './types'
 
 export interface TransformGizmoOptions {
   theme?: PartialTheme
@@ -29,6 +30,7 @@ export interface TransformGizmoOptions {
 interface DragState {
   axis: AxisId
   mode: GizmoMode
+  pointerId: number
   plane: Plane
   startPoint: Vector3
   positionStart: Vector3
@@ -70,12 +72,11 @@ const UNIT: Record<'X' | 'Y' | 'Z', Vector3> = { X: _unitX, Y: _unitY, Z: _unitZ
  * Add the instance to your scene. Dispatches the same event names as
  * TransformControls: change, objectChange, dragging-changed, mouseDown, mouseUp.
  */
-export class TransformGizmo extends Object3D {
+export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
   camera: Camera
   domElement: HTMLElement
   object: Object3D | null = null
 
-  enabled = true
   size = 1
   translationSnap: number | null = null
   rotationSnap: number | null = null
@@ -84,6 +85,7 @@ export class TransformGizmo extends Object3D {
   showY = true
   showZ = true
 
+  private _enabled = true
   private _mode: GizmoMode = 'translate'
   private _space: GizmoSpace = 'world'
   private _axis: AxisId | null = null
@@ -129,6 +131,14 @@ export class TransformGizmo extends Object3D {
 
   // ---------------------------------------------------------------- public API
 
+  get enabled(): boolean {
+    return this._enabled
+  }
+  set enabled(v: boolean) {
+    this._enabled = v
+    if (!v) this.endDrag()
+  }
+
   get mode(): GizmoMode {
     return this._mode
   }
@@ -138,7 +148,7 @@ export class TransformGizmo extends Object3D {
   setMode(mode: GizmoMode): void {
     this._mode = mode
     this._axis = null
-    this.dispatchEvent({ type: 'change' } as never)
+    this.dispatchEvent({ type: 'change' })
   }
 
   get space(): GizmoSpace {
@@ -149,7 +159,7 @@ export class TransformGizmo extends Object3D {
   }
   setSpace(space: GizmoSpace): void {
     this._space = space
-    this.dispatchEvent({ type: 'change' } as never)
+    this.dispatchEvent({ type: 'change' })
   }
 
   get axis(): AxisId | null {
@@ -170,22 +180,39 @@ export class TransformGizmo extends Object3D {
   }
   setSize(size: number): void {
     this.size = size
-    this.dispatchEvent({ type: 'change' } as never)
+    this.dispatchEvent({ type: 'change' })
   }
 
   attach(object: Object3D): this {
     this.object = object
     this.visible = true
-    this.dispatchEvent({ type: 'change' } as never)
+    this.dispatchEvent({ type: 'change' })
     return this
   }
 
   detach(): this {
+    this.endDrag()
     this.object = null
     this.visible = false
     this._axis = null
-    this.dispatchEvent({ type: 'change' } as never)
+    this.dispatchEvent({ type: 'change' })
     return this
+  }
+
+  /** the raycaster used for handle picking (e.g. to configure layers) */
+  getRaycaster(): Raycaster {
+    return _ray
+  }
+
+  /** cancel the current drag and restore the object's transform from drag start */
+  reset(): void {
+    if (!this._drag || !this.object) return
+    this.object.position.copy(this._drag.positionStart)
+    this.object.quaternion.copy(this._drag.quaternionStart)
+    this.object.scale.copy(this._drag.scaleStart)
+    this.dispatchEvent({ type: 'objectChange' })
+    this.dispatchEvent({ type: 'change' })
+    this.endDrag()
   }
 
   getTheme(): GizmoTheme {
@@ -193,6 +220,7 @@ export class TransformGizmo extends Object3D {
   }
 
   setTheme(partial: PartialTheme): void {
+    this.endDrag()
     this._theme = mergeTheme(this._theme, partial)
     // rebuild gizmos with new geometry sizes/colors
     this.remove(this._translate, this._rotate, this._scale, this._sector)
@@ -206,7 +234,7 @@ export class TransformGizmo extends Object3D {
     this._sector = new AngleSector(this._theme)
     this._sector.setRadius(this._theme.sizes.ringRadius)
     this.add(this._translate, this._rotate, this._scale, this._sector)
-    this.dispatchEvent({ type: 'change' } as never)
+    this.dispatchEvent({ type: 'change' })
   }
 
   dispose(): void {
@@ -267,14 +295,28 @@ export class TransformGizmo extends Object3D {
 
   private pickAxis(event: PointerEvent): AxisId | null {
     this.setRayFromEvent(event)
-    const pickers = this.activeGizmo().getPickers().filter((p) => p.visible)
+    const show = { x: this.showX, y: this.showY, z: this.showZ }
+    const pickers = this.activeGizmo()
+      .getPickers()
+      .filter((p) => ModeGizmo.axisShown(p.userData.handle.axis, show))
     const hits = _ray.intersectObjects(pickers, false)
     const hit = hits[0]
     return hit ? (hit.object as HandleMesh).userData.handle.axis : null
   }
 
+  /** end an active drag (pointer up, detach, disable, theme rebuild) */
+  private endDrag(): void {
+    if (!this._dragging) return
+    this._dragging = false
+    this._drag = null
+    this._sector.hide()
+    this.dispatchEvent({ type: 'mouseUp', mode: this._mode })
+    this.dispatchEvent({ type: 'dragging-changed', value: false })
+    this.dispatchEvent({ type: 'change' })
+  }
+
   private pointerDown(event: PointerEvent): void {
-    if (!this.enabled || !this.object || this._dragging || event.button !== 0) return
+    if (!this._enabled || !this.object || this._dragging || event.button !== 0) return
     const axis = this.pickAxis(event)
     if (!axis) return
     this._altKey = event.altKey
@@ -327,6 +369,7 @@ export class TransformGizmo extends Object3D {
     this._drag = {
       axis,
       mode: this._mode,
+      pointerId: event.pointerId,
       plane,
       startPoint,
       positionStart: object.position.clone(),
@@ -348,27 +391,32 @@ export class TransformGizmo extends Object3D {
     this._axis = axis
     this._dragging = true
     if (this._mode === 'rotate') this.orientSector()
-    this.domElement.setPointerCapture(event.pointerId)
-    this.dispatchEvent({ type: 'mouseDown', mode: this._mode } as never)
-    this.dispatchEvent({ type: 'dragging-changed', value: true } as never)
-    this.dispatchEvent({ type: 'change' } as never)
+    try {
+      this.domElement.setPointerCapture(event.pointerId)
+    } catch {
+      // pointer already gone (pen lift / touch-cancel race) — drag ends on pointerup/cancel
+    }
+    this.dispatchEvent({ type: 'mouseDown', mode: this._mode })
+    this.dispatchEvent({ type: 'dragging-changed', value: true })
+    this.dispatchEvent({ type: 'change' })
   }
 
   private pointerMove(event: PointerEvent): void {
-    if (!this.enabled || !this.object) return
+    if (!this._enabled || !this.object) return
     if (!this._dragging) {
+      if (!event.isPrimary) return
       const axis = this.pickAxis(event)
       if (axis !== this._axis) {
         const prev = this._axis
         this._axis = axis
-        if (axis) this.dispatchEvent({ type: 'hoveron', axis } as never)
-        else if (prev) this.dispatchEvent({ type: 'hoveroff' } as never)
-        this.dispatchEvent({ type: 'change' } as never)
+        if (axis) this.dispatchEvent({ type: 'hoveron', axis })
+        else if (prev) this.dispatchEvent({ type: 'hoveroff' })
+        this.dispatchEvent({ type: 'change' })
       }
       return
     }
     const drag = this._drag
-    if (!drag) return
+    if (!drag || event.pointerId !== drag.pointerId) return
     this._altKey = event.altKey
     this._shiftKey = event.shiftKey
 
@@ -380,19 +428,20 @@ export class TransformGizmo extends Object3D {
     else if (drag.mode === 'rotate') this.applyRotate(drag, point)
     else this.applyScale(drag, point)
 
-    this.dispatchEvent({ type: 'objectChange' } as never)
-    this.dispatchEvent({ type: 'change' } as never)
+    this.dispatchEvent({ type: 'objectChange' })
+    this.dispatchEvent({ type: 'change' })
   }
 
   private pointerUp(event: PointerEvent): void {
-    if (!this._dragging) return
+    if (!this._dragging || (this._drag && event.pointerId !== this._drag.pointerId)) return
     if (this.domElement.hasPointerCapture(event.pointerId)) this.domElement.releasePointerCapture(event.pointerId)
-    this._dragging = false
-    this._drag = null
-    this._sector.hide()
-    this.dispatchEvent({ type: 'mouseUp', mode: this._mode } as never)
-    this.dispatchEvent({ type: 'dragging-changed', value: false } as never)
-    this.dispatchEvent({ type: 'change' } as never)
+    this.endDrag()
+    // re-evaluate hover at the release position
+    const axis = this.pickAxis(event)
+    if (axis !== this._axis) {
+      this._axis = axis
+      this.dispatchEvent({ type: 'change' })
+    }
   }
 
   // ------------------------------------------------------------- drag: modes
@@ -409,11 +458,37 @@ export class TransformGizmo extends Object3D {
     }
     // plane handles and XYZ: offset already constrained by the drag plane
 
-    snapTranslate(offset, this.translationSnap, this._space === 'local' ? drag.worldQuaternionStart : undefined)
-
     // world offset -> parent local
     offset.applyQuaternion(drag.parentQuaternionInv).multiply(drag.parentScaleInv)
     object.position.copy(drag.positionStart).add(offset)
+
+    // snap the RESULTING position to the grid (TransformControls semantics),
+    // only on the axes involved in the drag
+    if (this.translationSnap) {
+      const snap = this.translationSnap
+      const p = object.position
+      if (this._space === 'local') {
+        p.applyQuaternion(_q1.copy(drag.quaternionStart).invert())
+        for (const l of ['X', 'Y', 'Z'] as const) {
+          if (drag.axis === 'XYZ' || bare.includes(l)) {
+            const k = l.toLowerCase() as 'x' | 'y' | 'z'
+            p[k] = Math.round(p[k] / snap) * snap
+          }
+        }
+        p.applyQuaternion(drag.quaternionStart)
+      } else {
+        // account for the parent's world translation so snapping is world-grid
+        // aligned (rotated/scaled parents follow TransformControls' approximation)
+        if (object.parent) p.add(_v3.setFromMatrixPosition(object.parent.matrixWorld))
+        for (const l of ['X', 'Y', 'Z'] as const) {
+          if (drag.axis === 'XYZ' || bare.includes(l)) {
+            const k = l.toLowerCase() as 'x' | 'y' | 'z'
+            p[k] = Math.round(p[k] / snap) * snap
+          }
+        }
+        if (object.parent) p.sub(_v3.setFromMatrixPosition(object.parent.matrixWorld))
+      }
+    }
   }
 
   private applyRotate(drag: DragState, point: Vector3): void {
@@ -435,6 +510,9 @@ export class TransformGizmo extends Object3D {
       .multiply(drag.parentQuaternion)
       .multiply(drag.quaternionStart)
 
+    // re-orient every move: in local space the gizmo root rotates with the
+    // object, so a one-shot orientation at pointerdown would drift
+    this.orientSector()
     this._sector.update(angle)
   }
 
@@ -477,8 +555,15 @@ export class TransformGizmo extends Object3D {
     const y = _v3.copy(n).cross(x).normalize()
     _m1.makeBasis(x, y, n)
     _q1.setFromRotationMatrix(_m1)
-    // sector lives inside the (scaled, rotated) gizmo root: convert world->gizmo
-    this._sector.quaternion.copy(this.quaternion).invert().multiply(_q1)
+    // sector lives inside the (scaled, rotated) gizmo root: convert world->gizmo.
+    // Compute the root's CURRENT orientation from the object (the cached
+    // this.quaternion lags a frame behind during a local-space rotate drag).
+    if (this._space === 'local' && this.object) {
+      _q2.copy(this._drag!.parentQuaternion).multiply(this.object.quaternion)
+    } else {
+      _q2.identity()
+    }
+    this._sector.quaternion.copy(_q2).invert().multiply(_q1)
     const radius = drag.mode === 'rotate' && drag.axis === 'E' ? this._theme.sizes.screenRingRadius : this._theme.sizes.ringRadius
     this._sector.setRadius(radius)
   }

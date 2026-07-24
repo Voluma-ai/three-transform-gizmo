@@ -24,13 +24,16 @@ export interface HandleInfo {
 }
 
 export interface GizmoEventMap {
-  change: object
-  objectChange: object
+  // eslint-disable-next-line @typescript-eslint/no-empty-object-type
+  change: {}
+  // eslint-disable-next-line @typescript-eslint/no-empty-object-type
+  objectChange: {}
   'dragging-changed': { value: boolean }
   mouseDown: { mode: GizmoMode }
   mouseUp: { mode: GizmoMode }
   hoveron: { axis: AxisId }
-  hoveroff: object
+  // eslint-disable-next-line @typescript-eslint/no-empty-object-type
+  hoveroff: {}
 }
 
 export interface AttachEvent {

@@ -65,9 +65,9 @@ const gizmo = new TransformGizmo(camera, renderer.domElement)
 gizmo.attach(cube)
 scene.add(gizmo)
 
-gizmo.addEventListener('dragging-changed', ((e: { value: boolean }) => {
+gizmo.addEventListener('dragging-changed', (e) => {
   orbit.enabled = !e.value
-}) as never)
+})
 
 // event log
 const logEl = document.getElementById('log')!
@@ -81,9 +81,9 @@ function log(msg: string) {
   logEl.scrollTop = logEl.scrollHeight
 }
 for (const type of ['mouseDown', 'mouseUp', 'dragging-changed', 'hoveron'] as const) {
-  gizmo.addEventListener(type, ((e: Record<string, unknown>) => {
+  gizmo.addEventListener(type, (e) => {
     log(`${type} ${JSON.stringify({ ...e, target: undefined, type: undefined })}`)
-  }) as never)
+  })
 }
 
 // UI
@@ -94,6 +94,7 @@ const modeButtons: Record<GizmoMode, HTMLElement> = {
 }
 function setMode(m: GizmoMode) {
   gizmo.setMode(m)
+  stock?.setMode(m)
   for (const [k, el] of Object.entries(modeButtons)) el.classList.toggle('active', k === m)
 }
 for (const m of Object.keys(modeButtons) as GizmoMode[]) modeButtons[m].onclick = () => setMode(m)
@@ -101,21 +102,25 @@ for (const m of Object.keys(modeButtons) as GizmoMode[]) modeButtons[m].onclick 
 const spaceBtn = document.getElementById('space')! as HTMLButtonElement
 spaceBtn.onclick = () => {
   gizmo.setSpace(gizmo.space === 'world' ? 'local' : 'world')
+  stock?.setSpace(gizmo.space)
   spaceBtn.textContent = gizmo.space
 }
 
 const cycleBtn = document.getElementById('cycle')! as HTMLButtonElement
 cycleBtn.onclick = () => {
   current = (current + 1) % objects.length
-  gizmo.attach(objects[current]!)
+  if (stock) stock.attach(objects[current]!)
+  else gizmo.attach(objects[current]!)
   cycleBtn.textContent = objectNames[current]!
 }
 
 const snapBox = document.getElementById('snap') as HTMLInputElement
 snapBox.onchange = () => {
-  gizmo.setTranslationSnap(snapBox.checked ? 1 : null)
-  gizmo.setRotationSnap(snapBox.checked ? (15 * Math.PI) / 180 : null)
-  gizmo.setScaleSnap(snapBox.checked ? 0.25 : null)
+  for (const g of [gizmo, stock]) {
+    g?.setTranslationSnap(snapBox.checked ? 1 : null)
+    g?.setRotationSnap(snapBox.checked ? (15 * Math.PI) / 180 : null)
+    g?.setScaleSnap(snapBox.checked ? 0.25 : null)
+  }
 }
 
 for (const a of ['X', 'Y', 'Z'] as const) {
@@ -135,6 +140,35 @@ themeBox.onchange = () => {
         }
       : { colors: { x: 0xe5484d, y: 0x30a46c, z: 0x0091ff, hover: 0xffd60a, active: 0xffd60a, sector: 0xffd60a }, sizes: { scaleCubeSize: 0.1, ringTube: 0.015, arrowHeadRadius: 0.06 } },
   )
+}
+
+// side-by-side compat check: swap in the stock TransformControls with the
+// exact same call sites (attach/setMode/setSpace/snaps/events)
+const compareBox = document.getElementById('compare') as HTMLInputElement
+let stock: import('three/examples/jsm/controls/TransformControls.js').TransformControls | null = null
+compareBox.onchange = async () => {
+  if (compareBox.checked) {
+    const { TransformControls } = await import('three/examples/jsm/controls/TransformControls.js')
+    stock = new TransformControls(camera, renderer.domElement)
+    stock.attach(objects[current]!)
+    stock.setMode(gizmo.mode)
+    stock.setSpace(gizmo.space)
+    stock.setTranslationSnap(gizmo.translationSnap)
+    stock.setRotationSnap(gizmo.rotationSnap)
+    stock.setScaleSnap(gizmo.scaleSnap)
+    stock.addEventListener('dragging-changed', ((e: { value: boolean }) => {
+      orbit.enabled = !e.value
+    }) as never)
+    // three <=r168: the controls object is itself the helper Object3D
+    scene.add(stock as unknown as Object3D)
+    gizmo.detach()
+  } else if (stock) {
+    scene.remove(stock as unknown as Object3D)
+    stock.detach()
+    stock.dispose()
+    stock = null
+    gizmo.attach(objects[current]!)
+  }
 }
 
 window.addEventListener('keydown', (e) => {

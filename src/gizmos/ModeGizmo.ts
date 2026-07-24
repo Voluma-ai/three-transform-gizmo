@@ -44,11 +44,7 @@ export abstract class ModeGizmo extends Object3D {
   updateVisuals(hoverAxis: AxisId | null, dragAxis: AxisId | null, theme: GizmoTheme, show: { x: boolean; y: boolean; z: boolean }): void {
     for (const h of this.getVisualHandles()) {
       const { axis, baseColor, baseOpacity } = h.userData.handle
-      const visible =
-        (axis === 'E' || axis === 'XYZ') ||
-        ((!ModeGizmo.axisUses(axis, 'X') || show.x) &&
-          (!ModeGizmo.axisUses(axis, 'Y') || show.y) &&
-          (!ModeGizmo.axisUses(axis, 'Z') || show.z))
+      const visible = ModeGizmo.axisShown(axis, show)
       h.visible = visible
       if (!visible) continue
       if (dragAxis) {
@@ -67,14 +63,17 @@ export abstract class ModeGizmo extends Object3D {
         h.material.opacity = theme.opacity.idle * baseOpacity
       }
     }
-    for (const p of this.getPickers()) {
-      const { axis } = p.userData.handle
-      p.visible =
-        (axis === 'E' || axis === 'XYZ') ||
-        ((!ModeGizmo.axisUses(axis, 'X') || show.x) &&
-          (!ModeGizmo.axisUses(axis, 'Y') || show.y) &&
-          (!ModeGizmo.axisUses(axis, 'Z') || show.z))
-    }
+  }
+
+  /** should a handle with this axis be active given the show flags? */
+  static axisShown(axis: AxisId, show: { x: boolean; y: boolean; z: boolean }): boolean {
+    return (
+      axis === 'E' ||
+      axis === 'XYZ' ||
+      ((!ModeGizmo.axisUses(axis, 'X') || show.x) &&
+        (!ModeGizmo.axisUses(axis, 'Y') || show.y) &&
+        (!ModeGizmo.axisUses(axis, 'Z') || show.z))
+    )
   }
 
   dispose(): void {
