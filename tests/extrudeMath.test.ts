@@ -148,6 +148,44 @@ describe('computeAnchoredScale', () => {
     expect(scale.x).toBeGreaterThan(0)
   })
 
+  it('non-uniform start scale: anchor invariant still holds', () => {
+    const scaleStart = new Vector3(2, 0.5, 3)
+    const input = baseInput({
+      scaleStart,
+      worldScaleStart: scaleStart.clone(),
+      offsetWorld: new Vector3(0.5, 0, 0),
+    })
+    const { scale, position } = computeAnchoredScale(input)
+    expect(scale.y).toBeCloseTo(0.5) // untouched axes preserved
+    expect(scale.z).toBeCloseTo(3)
+    const before = localToWorld(new Vector3(-0.5, 0, 0), input.positionStart, new Quaternion(), scaleStart)
+    const after = localToWorld(new Vector3(-0.5, 0, 0), position, new Quaternion(), scale)
+    expect(after.distanceTo(before)).toBeLessThan(1e-10)
+  })
+
+  it('mirrored object keeps its negative scale and grows in magnitude', () => {
+    const scaleStart = new Vector3(-1, 1, 1)
+    const input = baseInput({
+      scaleStart,
+      worldScaleStart: new Vector3(-1, 1, 1),
+      offsetWorld: new Vector3(0.5, 0, 0),
+    })
+    const { scale } = computeAnchoredScale(input)
+    expect(scale.x).toBeLessThan(0)
+    expect(Math.abs(scale.x)).toBeCloseTo(1.5)
+  })
+
+  it('zero start scale does not produce NaN', () => {
+    const input = baseInput({
+      scaleStart: new Vector3(0, 1, 1),
+      worldScaleStart: new Vector3(0, 1, 1),
+      offsetWorld: new Vector3(0.5, 0, 0),
+    })
+    const { scale, position } = computeAnchoredScale(input)
+    expect(Number.isFinite(scale.x)).toBe(true)
+    expect(Number.isFinite(position.x)).toBe(true)
+  })
+
   it('uniform XYZ scales all axes, center anchored', () => {
     const input = baseInput({ handle: 'XYZ' as AxisId, offsetWorld: new Vector3(0.5, 0, 0) })
     const { scale, position } = computeAnchoredScale(input)

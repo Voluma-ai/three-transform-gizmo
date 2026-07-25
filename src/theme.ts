@@ -93,12 +93,11 @@ export const defaultTheme: GizmoTheme = {
 }
 
 export function mergeTheme(base: GizmoTheme, partial?: PartialTheme): GizmoTheme {
-  if (!partial) return structuredClone(base)
   return {
-    colors: { ...base.colors, ...partial.colors },
-    opacity: { ...base.opacity, ...partial.opacity },
-    sizes: { ...base.sizes, ...partial.sizes },
-    snapping: { ...base.snapping, ...partial.snapping },
-    renderOrder: partial.renderOrder ?? base.renderOrder,
+    colors: { ...base.colors, ...partial?.colors },
+    opacity: { ...base.opacity, ...partial?.opacity },
+    sizes: { ...base.sizes, ...partial?.sizes },
+    snapping: { ...base.snapping, ...partial?.snapping },
+    renderOrder: partial?.renderOrder ?? base.renderOrder,
   }
 }

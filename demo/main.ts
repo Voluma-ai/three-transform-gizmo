@@ -138,7 +138,10 @@ themeBox.onchange = () => {
           colors: { x: 0xff6b9d, y: 0xa8e063, z: 0x56ccf2, hover: 0xffffff, active: 0xffffff, sector: 0x56ccf2 },
           sizes: { scaleCubeSize: 0.13, ringTube: 0.025, arrowHeadRadius: 0.08 },
         }
-      : { colors: { x: 0xe5484d, y: 0x30a46c, z: 0x0091ff, hover: 0xffd60a, active: 0xffd60a, sector: 0xffd60a }, sizes: { scaleCubeSize: 0.1, ringTube: 0.015, arrowHeadRadius: 0.06 } },
+      : {
+          colors: { x: 0xe5484d, y: 0x30a46c, z: 0x0091ff, hover: 0xffd60a, active: 0xffd60a, sector: 0xffd60a },
+          sizes: { scaleCubeSize: 0.1, ringTube: 0.015, arrowHeadRadius: 0.06 },
+        },
   )
 }
 
@@ -193,7 +196,7 @@ Object.assign(window as never, {
   __gizmo: gizmo,
   __objects: objects,
   __camera: camera,
-  __THREE: { Vector3: (cube.position.constructor as unknown), Quaternion: (cube.quaternion.constructor as unknown) },
+  __THREE: { Vector3: cube.position.constructor as unknown, Quaternion: cube.quaternion.constructor as unknown },
 })
 
 renderer.setAnimationLoop(() => {

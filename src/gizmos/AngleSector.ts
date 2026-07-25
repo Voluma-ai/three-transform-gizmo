@@ -34,12 +34,6 @@ export class AngleSector extends Mesh<BufferGeometry, MeshBasicMaterial> {
     this.frustumCulled = false
   }
 
-  setStyle(theme: GizmoTheme): void {
-    this.material.color.setHex(theme.colors.sector)
-    this.material.opacity = theme.opacity.sector
-    this.renderOrder = theme.renderOrder - 1
-  }
-
   setRadius(r: number): void {
     this.radius = r
   }
@@ -55,9 +49,15 @@ export class AngleSector extends Mesh<BufferGeometry, MeshBasicMaterial> {
       const a0 = (a * i) / segments
       const a1 = (a * (i + 1)) / segments
       const o = i * 9
-      arr[o] = 0; arr[o + 1] = 0; arr[o + 2] = 0
-      arr[o + 3] = Math.cos(a0) * r; arr[o + 4] = Math.sin(a0) * r; arr[o + 5] = 0
-      arr[o + 6] = Math.cos(a1) * r; arr[o + 7] = Math.sin(a1) * r; arr[o + 8] = 0
+      arr[o] = 0
+      arr[o + 1] = 0
+      arr[o + 2] = 0
+      arr[o + 3] = Math.cos(a0) * r
+      arr[o + 4] = Math.sin(a0) * r
+      arr[o + 5] = 0
+      arr[o + 6] = Math.cos(a1) * r
+      arr[o + 7] = Math.sin(a1) * r
+      arr[o + 8] = 0
     }
     attr.needsUpdate = true
     this.geometry.setDrawRange(0, segments * 3)

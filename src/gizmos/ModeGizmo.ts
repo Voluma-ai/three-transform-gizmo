@@ -41,7 +41,12 @@ export abstract class ModeGizmo extends Object3D {
    * Per-frame visual state: hover/active tint and fading of inactive handles
    * while dragging.
    */
-  updateVisuals(hoverAxis: AxisId | null, dragAxis: AxisId | null, theme: GizmoTheme, show: { x: boolean; y: boolean; z: boolean }): void {
+  updateVisuals(
+    hoverAxis: AxisId | null,
+    dragAxis: AxisId | null,
+    theme: GizmoTheme,
+    show: { x: boolean; y: boolean; z: boolean },
+  ): void {
     for (const h of this.getVisualHandles()) {
       const { axis, baseColor, baseOpacity } = h.userData.handle
       const visible = ModeGizmo.axisShown(axis, show)

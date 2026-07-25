@@ -1,5 +1,3 @@
-import type { Object3D } from 'three'
-
 export type GizmoMode = 'translate' | 'rotate' | 'scale'
 export type GizmoSpace = 'world' | 'local'
 
@@ -11,11 +9,26 @@ export type GizmoSpace = 'world' | 'local'
  *            (sign = the grabbed side; the opposite side is the anchor)
  */
 export type AxisId =
-  | 'X' | 'Y' | 'Z'
-  | 'XY' | 'XZ' | 'YZ'
-  | 'XYZ' | 'E'
-  | '+X' | '-X' | '+Y' | '-Y' | '+Z' | '-Z'
-  | '+XY' | '-XY' | '+XZ' | '-XZ' | '+YZ' | '-YZ'
+  | 'X'
+  | 'Y'
+  | 'Z'
+  | 'XY'
+  | 'XZ'
+  | 'YZ'
+  | 'XYZ'
+  | 'E'
+  | '+X'
+  | '-X'
+  | '+Y'
+  | '-Y'
+  | '+Z'
+  | '-Z'
+  | '+XY'
+  | '-XY'
+  | '+XZ'
+  | '-XZ'
+  | '+YZ'
+  | '-YZ'
 
 export interface HandleInfo {
   mode: GizmoMode
@@ -23,19 +36,16 @@ export interface HandleInfo {
   picker?: boolean
 }
 
+/** Payloads for the events dispatched by {@link TransformGizmo}. */
 export interface GizmoEventMap {
-  // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-  change: {}
-  // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-  objectChange: {}
+  /** the gizmo needs a re-render (hover, mode/space change, drag) */
+  change: Record<string, unknown>
+  /** the attached object's transform was modified by a drag */
+  objectChange: Record<string, unknown>
+  /** a drag started (true) or ended (false) — use it to gate orbit controls */
   'dragging-changed': { value: boolean }
   mouseDown: { mode: GizmoMode }
   mouseUp: { mode: GizmoMode }
   hoveron: { axis: AxisId }
-  // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-  hoveroff: {}
-}
-
-export interface AttachEvent {
-  object: Object3D
+  hoveroff: Record<string, unknown>
 }

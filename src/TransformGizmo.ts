@@ -30,6 +30,8 @@ export interface TransformGizmoOptions {
 interface DragState {
   axis: AxisId
   mode: GizmoMode
+  /** space captured at drag start, so the drag stays consistent */
+  space: GizmoSpace
   pointerId: number
   plane: Plane
   startPoint: Vector3
@@ -49,7 +51,6 @@ interface DragState {
   handleDistanceWorld: number
 }
 
-const _ray = new Raycaster()
 const _pointer = new Vector2()
 const _v1 = new Vector3()
 const _v2 = new Vector3()
@@ -57,7 +58,13 @@ const _v3 = new Vector3()
 const _q1 = new Quaternion()
 const _q2 = new Quaternion()
 const _m1 = new Matrix4()
+const _m2 = new Matrix4()
 const _box = new Box3()
+const _childBox = new Box3()
+// dedicated scratch for matrix decomposition, kept separate from _v1.._v3 so
+// decomposing never clobbers a caller's in-flight vector
+const _decompPos = new Vector3()
+const _decompScale = new Vector3()
 const _unitX = new Vector3(1, 0, 0)
 const _unitY = new Vector3(0, 1, 0)
 const _unitZ = new Vector3(0, 0, 1)
@@ -100,6 +107,7 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
   private _scale: ScaleGizmo
   private _sector: AngleSector
 
+  private _raycaster = new Raycaster()
   private _worldPosition = new Vector3()
   private _worldQuaternion = new Quaternion()
   private _eye = new Vector3()
@@ -146,6 +154,8 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
     this.setMode(m)
   }
   setMode(mode: GizmoMode): void {
+    if (mode === this._mode) return
+    this.endDrag()
     this._mode = mode
     this._axis = null
     this.dispatchEvent({ type: 'change' })
@@ -158,6 +168,8 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
     this.setSpace(s)
   }
   setSpace(space: GizmoSpace): void {
+    if (space === this._space) return
+    this.endDrag()
     this._space = space
     this.dispatchEvent({ type: 'change' })
   }
@@ -201,15 +213,19 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
 
   /** the raycaster used for handle picking (e.g. to configure layers) */
   getRaycaster(): Raycaster {
-    return _ray
+    return this._raycaster
   }
 
   /** cancel the current drag and restore the object's transform from drag start */
   reset(): void {
-    if (!this._drag || !this.object) return
-    this.object.position.copy(this._drag.positionStart)
-    this.object.quaternion.copy(this._drag.quaternionStart)
-    this.object.scale.copy(this._drag.scaleStart)
+    const drag = this._drag
+    if (!drag || !this.object) return
+    this.object.position.copy(drag.positionStart)
+    this.object.quaternion.copy(drag.quaternionStart)
+    this.object.scale.copy(drag.scaleStart)
+    if (this.domElement.hasPointerCapture(drag.pointerId)) {
+      this.domElement.releasePointerCapture(drag.pointerId)
+    }
     this.dispatchEvent({ type: 'objectChange' })
     this.dispatchEvent({ type: 'change' })
     this.endDrag()
@@ -238,6 +254,7 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
   }
 
   dispose(): void {
+    this.endDrag()
     this.domElement.removeEventListener('pointerdown', this._onPointerDown)
     this.domElement.removeEventListener('pointermove', this._onPointerMove)
     this.domElement.removeEventListener('pointerup', this._onPointerUp)
@@ -253,7 +270,7 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
   override updateMatrixWorld(force?: boolean): void {
     if (this.object) {
       this.object.updateWorldMatrix(true, false)
-      this.object.matrixWorld.decompose(this._worldPosition, this._worldQuaternion, _v1)
+      this.object.matrixWorld.decompose(this._worldPosition, this._worldQuaternion, _decompScale)
       this.position.copy(this._worldPosition)
 
       const useLocal = this._space === 'local' || this._mode === 'scale'
@@ -289,17 +306,23 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
 
   private setRayFromEvent(event: PointerEvent): void {
     const rect = this.domElement.getBoundingClientRect()
-    _pointer.set(((event.clientX - rect.left) / rect.width) * 2 - 1, (-(event.clientY - rect.top) / rect.height) * 2 + 1)
-    _ray.setFromCamera(_pointer, this.camera)
+    _pointer.set(
+      ((event.clientX - rect.left) / rect.width) * 2 - 1,
+      (-(event.clientY - rect.top) / rect.height) * 2 + 1,
+    )
+    this._raycaster.setFromCamera(_pointer, this.camera)
   }
 
   private pickAxis(event: PointerEvent): AxisId | null {
+    // make sure handle world matrices reflect the current camera/object state:
+    // picking can happen before the app's first render after attach()
+    this.updateMatrixWorld(true)
     this.setRayFromEvent(event)
     const show = { x: this.showX, y: this.showY, z: this.showZ }
     const pickers = this.activeGizmo()
       .getPickers()
       .filter((p) => ModeGizmo.axisShown(p.userData.handle.axis, show))
-    const hits = _ray.intersectObjects(pickers, false)
+    const hits = this._raycaster.intersectObjects(pickers, false)
     const hit = hits[0]
     return hit ? (hit.object as HandleMesh).userData.handle.axis : null
   }
@@ -343,7 +366,7 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
     getDragPlane(this._mode, axis, this._space, worldQuaternionStart, worldPositionStart, this._eye, plane)
     this.setRayFromEvent(event)
     const startPoint = new Vector3()
-    if (!intersectPlane(_ray.ray, plane, startPoint)) return
+    if (!intersectPlane(this._raycaster.ray, plane, startPoint)) return
 
     const rotationAxisWorld = new Vector3()
     if (this._mode === 'rotate') {
@@ -360,15 +383,17 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
     if (this._mode === 'scale') {
       this.computeLocalBounds(object, localHalfExtents, localCenterOffset)
       const gizmoScale = (this._factor * this.size * this._theme.sizes.gizmoSize) / 4
-      const dist = axis === 'XYZ' || axis.replace(/^[+-]/, '').length === 1
-        ? this._scale.handleDistance
-        : this._scale.planeHandleDistance
+      const dist =
+        axis === 'XYZ' || axis.replace(/^[+-]/, '').length === 1
+          ? this._scale.handleDistance
+          : this._scale.planeHandleDistance
       handleDistanceWorld = Math.max(gizmoScale * dist, 1e-6)
     }
 
     this._drag = {
       axis,
       mode: this._mode,
+      space: this._mode === 'scale' ? 'local' : this._space,
       pointerId: event.pointerId,
       plane,
       startPoint,
@@ -405,14 +430,7 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
     if (!this._enabled || !this.object) return
     if (!this._dragging) {
       if (!event.isPrimary) return
-      const axis = this.pickAxis(event)
-      if (axis !== this._axis) {
-        const prev = this._axis
-        this._axis = axis
-        if (axis) this.dispatchEvent({ type: 'hoveron', axis })
-        else if (prev) this.dispatchEvent({ type: 'hoveroff' })
-        this.dispatchEvent({ type: 'change' })
-      }
+      this.updateHover(this.pickAxis(event))
       return
     }
     const drag = this._drag
@@ -421,7 +439,7 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
     this._shiftKey = event.shiftKey
 
     this.setRayFromEvent(event)
-    if (!intersectPlane(_ray.ray, drag.plane, _v1)) return
+    if (!intersectPlane(this._raycaster.ray, drag.plane, _v1)) return
     const point = _v1
 
     if (drag.mode === 'translate') this.applyTranslate(drag, point)
@@ -436,12 +454,17 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
     if (!this._dragging || (this._drag && event.pointerId !== this._drag.pointerId)) return
     if (this.domElement.hasPointerCapture(event.pointerId)) this.domElement.releasePointerCapture(event.pointerId)
     this.endDrag()
-    // re-evaluate hover at the release position
-    const axis = this.pickAxis(event)
-    if (axis !== this._axis) {
-      this._axis = axis
-      this.dispatchEvent({ type: 'change' })
-    }
+    this.updateHover(this.pickAxis(event))
+  }
+
+  /** apply a new hover axis, firing hoveron/hoveroff/change as needed */
+  private updateHover(axis: AxisId | null): void {
+    if (axis === this._axis) return
+    const prev = this._axis
+    this._axis = axis
+    if (axis) this.dispatchEvent({ type: 'hoveron', axis })
+    else if (prev) this.dispatchEvent({ type: 'hoveroff' })
+    this.dispatchEvent({ type: 'change' })
   }
 
   // ------------------------------------------------------------- drag: modes
@@ -453,7 +476,7 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
     const bare = drag.axis.replace(/^[+-]/, '')
     if (bare.length === 1 && bare !== 'E') {
       const dir = _v3.copy(UNIT[bare as 'X' | 'Y' | 'Z'])
-      if (this._space === 'local') dir.applyQuaternion(drag.worldQuaternionStart)
+      if (drag.space === 'local') dir.applyQuaternion(drag.worldQuaternionStart)
       offset.copy(dir.multiplyScalar(offset.dot(dir.clone().normalize())))
     }
     // plane handles and XYZ: offset already constrained by the drag plane
@@ -467,7 +490,7 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
     if (this.translationSnap) {
       const snap = this.translationSnap
       const p = object.position
-      if (this._space === 'local') {
+      if (drag.space === 'local') {
         p.applyQuaternion(_q1.copy(drag.quaternionStart).invert())
         for (const l of ['X', 'Y', 'Z'] as const) {
           if (drag.axis === 'XYZ' || bare.includes(l)) {
@@ -552,19 +575,31 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
     const drag = this._drag!
     const n = drag.rotationAxisWorld
     const x = drag.sectorStartDir
+    if (x.lengthSq() < 1e-12 || n.lengthSq() < 1e-12) return // degenerate grab at the exact center
     const y = _v3.copy(n).cross(x).normalize()
+    if (y.lengthSq() < 1e-12) return
     _m1.makeBasis(x, y, n)
     _q1.setFromRotationMatrix(_m1)
-    // sector lives inside the (scaled, rotated) gizmo root: convert world->gizmo.
-    // Compute the root's CURRENT orientation from the object (the cached
-    // this.quaternion lags a frame behind during a local-space rotate drag).
-    if (this._space === 'local' && this.object) {
-      _q2.copy(this._drag!.parentQuaternion).multiply(this.object.quaternion)
+    // The sector lives inside the gizmo root, so convert world -> gizmo space.
+    // Derive the root's CURRENT world orientation the same way updateMatrixWorld
+    // does (decompose, not parentQ * localQ — those differ under non-uniform
+    // parent scale), because this.quaternion lags a frame during a local drag.
+    const useLocal = this._space === 'local' || this._mode === 'scale'
+    if (useLocal && this.object) {
+      if (this.object.parent) {
+        this.object.updateMatrix()
+        _m2
+          .multiplyMatrices(this.object.parent.matrixWorld, this.object.matrix)
+          .decompose(_decompPos, _q2, _decompScale)
+      } else {
+        _q2.copy(this.object.quaternion)
+      }
     } else {
       _q2.identity()
     }
     this._sector.quaternion.copy(_q2).invert().multiply(_q1)
-    const radius = drag.mode === 'rotate' && drag.axis === 'E' ? this._theme.sizes.screenRingRadius : this._theme.sizes.ringRadius
+    const radius =
+      drag.mode === 'rotate' && drag.axis === 'E' ? this._theme.sizes.screenRingRadius : this._theme.sizes.ringRadius
     this._sector.setRadius(radius)
   }
 
@@ -573,6 +608,9 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
    * half extents + center offset, used to place the extrude anchor.
    */
   private computeLocalBounds(object: Object3D, halfExtents: Vector3, centerOffset: Vector3): void {
+    // descendants' matrixWorld may be stale (attach + grab before the first
+    // render, or children moved programmatically) — refresh the subtree
+    object.updateWorldMatrix(false, true)
     _m1.copy(object.matrixWorld).invert()
     _box.makeEmpty()
     object.traverse((child) => {
@@ -581,9 +619,9 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
       if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox()
       const bb = mesh.geometry.boundingBox
       if (!bb) return
-      const rel = new Matrix4().multiplyMatrices(_m1, child.matrixWorld)
-      const b = bb.clone().applyMatrix4(rel)
-      _box.union(b)
+      _m2.multiplyMatrices(_m1, child.matrixWorld)
+      _childBox.copy(bb).applyMatrix4(_m2)
+      _box.union(_childBox)
     })
     if (_box.isEmpty()) {
       halfExtents.set(0.5, 0.5, 0.5)

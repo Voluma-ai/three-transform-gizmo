@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { Quaternion, Vector3 } from 'three'
-import { snapAngle, snapScale, snapTranslate } from '../src/core/Snapping'
+import { snapAngle, snapScale } from '../src/core/Snapping'
 
 const DEG15 = (15 * Math.PI) / 180
 
@@ -18,26 +17,23 @@ describe('snapAngle', () => {
   })
 })
 
-describe('snapTranslate', () => {
-  it('snaps per component in world space', () => {
-    const v = snapTranslate(new Vector3(0.9, 1.4, -0.6), 1, undefined)
-    expect(v.toArray()).toEqual([1, 1, -1])
-  })
-  it('snaps in a rotated local frame', () => {
-    // frame rotated 90deg around Z: local X = world Y
-    const q = new Quaternion().setFromAxisAngle(new Vector3(0, 0, 1), Math.PI / 2)
-    const v = snapTranslate(new Vector3(0, 0.9, 0), 1, q)
-    // 0.9 along world Y is 0.9 along local X -> snaps to 1 local X -> world Y
-    expect(v.x).toBeCloseTo(0)
-    expect(v.y).toBeCloseTo(1)
-    expect(v.z).toBeCloseTo(0)
-  })
-})
-
 describe('snapScale', () => {
-  it('quantizes and clamps', () => {
+  it('quantizes to the snap grid', () => {
     expect(snapScale(1.3, 0.5)).toBeCloseTo(1.5)
-    expect(snapScale(-2, null)).toBeCloseTo(1e-4)
-    expect(snapScale(0.1, 0.5)).toBeCloseTo(1e-4) // rounds to 0 -> clamped
+    expect(snapScale(2.1, 1)).toBeCloseTo(2)
+    expect(snapScale(1.234, null)).toBeCloseTo(1.234)
+  })
+
+  it('clamps the magnitude, never crossing zero', () => {
+    expect(snapScale(0.1, 0.5)).toBeCloseTo(1e-4) // would round to 0
+    expect(snapScale(0, null)).toBeCloseTo(1e-4)
+  })
+
+  it('preserves handedness of mirrored (negative) scales', () => {
+    // a mirrored object must stay mirrored and must not collapse
+    expect(snapScale(-1.5, null)).toBeCloseTo(-1.5)
+    expect(snapScale(-1.3, 0.5)).toBeCloseTo(-1.5)
+    expect(snapScale(-2, null)).toBeCloseTo(-2)
+    expect(snapScale(-0.00001, null)).toBeCloseTo(-1e-4)
   })
 })

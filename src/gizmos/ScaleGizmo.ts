@@ -63,7 +63,14 @@ export class ScaleGizmo extends ModeGizmo {
         cube.rotation.copy(rot)
         this.visual.add(cube)
 
-        const picker = makeHandle(geo.sphere(t.sizes.scaleCubeSize * t.sizes.pickerScale * 0.6), 0, 'scale', axis, t, true)
+        const picker = makeHandle(
+          geo.sphere(t.sizes.scaleCubeSize * t.sizes.pickerScale * 0.6),
+          0,
+          'scale',
+          axis,
+          t,
+          true,
+        )
         picker.position.copy(cube.position)
         this.picker.add(picker)
       }

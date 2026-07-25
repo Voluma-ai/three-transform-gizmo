@@ -73,7 +73,7 @@ export function computeAnchoredScale(input: AnchoredScaleInput): AnchoredScaleRe
   if (input.handle === 'XYZ') {
     // uniform, always center-anchored; ratio from drag along camera-right is
     // computed by the caller and passed via offsetWorld.x (see TransformGizmo)
-    const s = Math.max(1e-4, 1 + input.offsetWorld.x / Math.max(input.handleDistanceWorld, 1e-6))
+    const s = Math.max(1e-4, 1 + input.offsetWorld.x / Math.max(Math.abs(input.handleDistanceWorld), 1e-6))
     for (const a of ['x', 'y', 'z'] as AxisKey[]) {
       scale[a] = snapScale(input.scaleStart[a] * s, input.scaleSnap)
     }

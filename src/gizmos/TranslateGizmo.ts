@@ -36,7 +36,12 @@ export class TranslateGizmo extends ModeGizmo {
       this.visual.add(head)
 
       const picker = makeHandle(
-        new CylinderGeometry(t.sizes.arrowHeadRadius * t.sizes.pickerScale, t.sizes.arrowHeadRadius * t.sizes.pickerScale, t.sizes.arrowLength, 6),
+        new CylinderGeometry(
+          t.sizes.arrowHeadRadius * t.sizes.pickerScale,
+          t.sizes.arrowHeadRadius * t.sizes.pickerScale,
+          t.sizes.arrowLength,
+          6,
+        ),
         0,
         'translate',
         axis,
