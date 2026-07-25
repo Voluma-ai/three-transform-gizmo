@@ -265,4 +265,4 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 ## License
 
-[MIT](./LICENSE) © Voluma
+[MIT](./LICENSE) © [VOLUMA B.V.](https://voluma.ai)
