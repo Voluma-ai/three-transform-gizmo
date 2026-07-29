@@ -6,6 +6,13 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Translate arrows now appear on both ends of each axis, so an object can be
+  dragged from either side. Matching three.js `TransformControls`, only the
+  positive side draws a shaft — the negative side is the arrow head alone. Both
+  heads report the same axis, so dragging either behaves identically.
+
 ## [0.4.0] - 2026-07-29
 
 ### Changed
