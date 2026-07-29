@@ -264,6 +264,31 @@ describe('scale (extrude)', () => {
     expect(empty.position.length()).toBeCloseTo(0)
   })
 
+  it('scales every axis by one ratio when Shift is held', () => {
+    gizmo.setMode('scale')
+    drag(handlePoint(X, 0.8), 60, 0, { shiftKey: true })
+    expect(cube.scale.x).toBeGreaterThan(1.05)
+    expect(cube.scale.y).toBeCloseTo(cube.scale.x)
+    expect(cube.scale.z).toBeCloseTo(cube.scale.x)
+  })
+
+  it('still anchors the opposite face when Shift is held', () => {
+    gizmo.setMode('scale')
+    const anchorBefore = new Vector3(-0.5, 0, 0).applyMatrix4(cube.matrixWorld)
+    drag(handlePoint(X, 0.8), 60, 0, { shiftKey: true })
+    cube.updateWorldMatrix(true, false)
+    const anchorAfter = new Vector3(-0.5, 0, 0).applyMatrix4(cube.matrixWorld)
+    expect(anchorAfter.distanceTo(anchorBefore)).toBeLessThan(1e-6)
+  })
+
+  it('combines Shift and Alt: proportional growth about the origin', () => {
+    gizmo.setMode('scale')
+    drag(handlePoint(X, 0.8), 60, 0, { shiftKey: true, altKey: true })
+    expect(cube.scale.x).toBeGreaterThan(1.05)
+    expect(cube.scale.z).toBeCloseTo(cube.scale.x)
+    expect(cube.position.length()).toBeCloseTo(0)
+  })
+
   it('keeps mirrored objects mirrored', () => {
     cube.scale.set(-1, 1, 1)
     scene.updateMatrixWorld(true)

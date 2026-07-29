@@ -27,6 +27,11 @@ export interface AnchoredScaleInput {
   handleDistanceWorld: number
   /** true = scale from center (Alt held); false = anchor the opposite side */
   centerAnchored: boolean
+  /**
+   * true = constrain proportions (Shift held): every axis takes the same ratio,
+   * derived from the dragged axes, instead of only the dragged ones changing.
+   */
+  proportional?: boolean
   scaleSnap: number | null
 }
 
@@ -63,6 +68,10 @@ const _tmp = new Vector3()
  * direction; the resulting handle-distance ratio gives the per-axis scale
  * factor. Unless centerAnchored, the object's position shifts so the face
  * (or corner) opposite the grabbed handle stays fixed in world space.
+ *
+ * When proportional, that ratio is applied to all three axes rather than only
+ * the dragged ones. The anchor still belongs to the dragged axes alone — the
+ * axes that come along for the ride grow about the origin.
  */
 export function computeAnchoredScale(input: AnchoredScaleInput): AnchoredScaleResult {
   const { axes, sign } = parseScaleHandle(input.handle)
@@ -80,18 +89,44 @@ export function computeAnchoredScale(input: AnchoredScaleInput): AnchoredScaleRe
     return { scale, position }
   }
 
-  for (const a of axes) {
-    // world direction of this local axis, pointing toward the grabbed handle
+  /** world direction of a local axis, pointing toward the grabbed handle */
+  const axisDir = (a: AxisKey) =>
     _u.copy(AXIS_VECS[a]).applyQuaternion(input.worldQuaternionStart).normalize().multiplyScalar(sign)
-    const d = input.offsetWorld.dot(_u)
+
+  const rawRatio = (a: AxisKey) => {
+    const d = input.offsetWorld.dot(axisDir(a))
     const h0 = input.handleDistanceWorld
-    const s = Math.max(1e-4, (h0 + d) / h0)
+    return Math.max(1e-4, (h0 + d) / h0)
+  }
+
+  // One ratio for every axis: the mean over the dragged axes, so a plane handle
+  // stays symmetric instead of favouring whichever axis is listed first.
+  let proportionalRatio = input.proportional ? axes.reduce((sum, a) => sum + rawRatio(a), 0) / axes.length : 0
+
+  if (input.proportional && input.scaleSnap) {
+    // Snap one representative magnitude, then reuse its effective ratio for
+    // every axis. Snapping each resulting component independently would distort
+    // an object whose starting scale is non-uniform.
+    const referenceScale = axes.reduce((sum, a) => sum + Math.abs(input.scaleStart[a]), 0) / axes.length
+    if (referenceScale >= 1e-10) {
+      const snappedReferenceScale = Math.abs(snapScale(referenceScale * proportionalRatio, input.scaleSnap))
+      proportionalRatio = snappedReferenceScale / referenceScale
+    }
+  }
+
+  const draggedAxes = new Set(axes)
+  const scaledAxes: AxisKey[] = input.proportional ? ['x', 'y', 'z'] : axes
+
+  for (const a of scaledAxes) {
     const startAxisScale = Math.abs(input.scaleStart[a]) < 1e-10 ? 1e-10 : input.scaleStart[a]
-    const newAxisScale = snapScale(startAxisScale * s, input.scaleSnap)
-    const effectiveRatio = newAxisScale / startAxisScale
+    const newAxisScale = input.proportional
+      ? input.scaleStart[a] * proportionalRatio
+      : snapScale(startAxisScale * rawRatio(a), input.scaleSnap)
+    const effectiveRatio = input.proportional ? proportionalRatio : newAxisScale / startAxisScale
     scale[a] = newAxisScale
 
-    if (!input.centerAnchored) {
+    // Only a dragged axis has a face to pin.
+    if (!input.centerAnchored && draggedAxes.has(a)) {
       // Keep the opposite face fixed: the anchor sits at
       // (center - sign*e) along the axis in local units. When the axis scale
       // grows by ratio r, every local point p maps to world offset that grows
@@ -101,7 +136,7 @@ export function computeAnchoredScale(input: AnchoredScaleInput): AnchoredScaleRe
       const e = input.localHalfExtents[a]
       const c = input.localCenterOffset[a] * sign
       const shiftLen = input.worldScaleStart[a] * (effectiveRatio - 1) * (e - c)
-      _shift.addScaledVector(_u, shiftLen)
+      _shift.addScaledVector(axisDir(a), shiftLen)
     }
   }
 
