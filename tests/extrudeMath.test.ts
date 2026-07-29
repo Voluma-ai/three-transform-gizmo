@@ -110,6 +110,25 @@ describe('computeAnchoredScale', () => {
     expect(scale.y).toBeCloseTo(-3)
   })
 
+  it('proportional scaleSnap preserves a non-uniform starting ratio', () => {
+    const scaleStart = new Vector3(1, -2, 3)
+    const input = baseInput({
+      offsetWorld: new Vector3(0.3, 0, 0),
+      proportional: true,
+      scaleSnap: 0.25,
+      scaleStart,
+      worldScaleStart: scaleStart.clone(),
+    })
+    const { scale, position } = computeAnchoredScale(input)
+    expect(scale.x).toBeCloseTo(1.25)
+    expect(scale.y).toBeCloseTo(-2.5)
+    expect(scale.z).toBeCloseTo(3.75)
+
+    const before = localToWorld(new Vector3(-0.5, 0, 0), input.positionStart, new Quaternion(), scaleStart)
+    const after = localToWorld(new Vector3(-0.5, 0, 0), position, new Quaternion(), scale)
+    expect(after.distanceTo(before)).toBeLessThan(1e-10)
+  })
+
   it('rotated object: anchor invariant holds in world space', () => {
     const q = new Quaternion().setFromAxisAngle(new Vector3(0, 0, 1), Math.PI / 4)
     // drag along the world direction of local +X

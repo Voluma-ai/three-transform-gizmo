@@ -101,16 +101,28 @@ export function computeAnchoredScale(input: AnchoredScaleInput): AnchoredScaleRe
 
   // One ratio for every axis: the mean over the dragged axes, so a plane handle
   // stays symmetric instead of favouring whichever axis is listed first.
-  const uniformRatio = input.proportional ? axes.reduce((sum, a) => sum + rawRatio(a), 0) / axes.length : 0
+  let proportionalRatio = input.proportional ? axes.reduce((sum, a) => sum + rawRatio(a), 0) / axes.length : 0
+
+  if (input.proportional && input.scaleSnap) {
+    // Snap one representative magnitude, then reuse its effective ratio for
+    // every axis. Snapping each resulting component independently would distort
+    // an object whose starting scale is non-uniform.
+    const referenceScale = axes.reduce((sum, a) => sum + Math.abs(input.scaleStart[a]), 0) / axes.length
+    if (referenceScale >= 1e-10) {
+      const snappedReferenceScale = Math.abs(snapScale(referenceScale * proportionalRatio, input.scaleSnap))
+      proportionalRatio = snappedReferenceScale / referenceScale
+    }
+  }
 
   const draggedAxes = new Set(axes)
   const scaledAxes: AxisKey[] = input.proportional ? ['x', 'y', 'z'] : axes
 
   for (const a of scaledAxes) {
-    const s = input.proportional ? uniformRatio : rawRatio(a)
     const startAxisScale = Math.abs(input.scaleStart[a]) < 1e-10 ? 1e-10 : input.scaleStart[a]
-    const newAxisScale = snapScale(startAxisScale * s, input.scaleSnap)
-    const effectiveRatio = newAxisScale / startAxisScale
+    const newAxisScale = input.proportional
+      ? input.scaleStart[a] * proportionalRatio
+      : snapScale(startAxisScale * rawRatio(a), input.scaleSnap)
+    const effectiveRatio = input.proportional ? proportionalRatio : newAxisScale / startAxisScale
     scale[a] = newAxisScale
 
     // Only a dragged axis has a face to pin.
