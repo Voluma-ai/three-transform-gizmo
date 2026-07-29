@@ -14,6 +14,10 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `0.0075` (was `0.015`). Pick radius is unchanged — the invisible picker torus
   multiplier was doubled to compensate. Override `sizes.ringTube` to restore the
   previous look.
+- Translate and scale axis shafts are half as thick by default to match:
+  `theme.sizes.axisLineRadius` is now `0.00625` (was `0.0125`). Pick radii for
+  those handles derive from `arrowHeadRadius` / `scaleCubeSize`, so grabbing is
+  unaffected. Override `sizes.axisLineRadius` to restore the previous look.
 
 ## [0.3.0] - 2026-07-29
 

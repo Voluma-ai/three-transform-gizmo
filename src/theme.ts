@@ -89,7 +89,7 @@ export const defaultTheme: GizmoTheme = {
     arrowLength: 0.8,
     arrowHeadLength: 0.2,
     arrowHeadRadius: 0.06,
-    axisLineRadius: 0.0125,
+    axisLineRadius: 0.00625,
     planeOffset: 0.45,
     planeSize: 0.22,
     ringRadius: 0.75,
