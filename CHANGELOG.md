@@ -6,6 +6,13 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- Rotate rings are half as thick by default: `theme.sizes.ringTube` is now
+  `0.0075` (was `0.015`). Pick radius is unchanged — the invisible picker torus
+  multiplier was doubled to compensate. Override `sizes.ringTube` to restore the
+  previous look.
+
 ## [0.3.0] - 2026-07-29
 
 ### Added
