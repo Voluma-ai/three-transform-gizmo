@@ -148,6 +148,10 @@ themeBox.onchange = () => {
 // side-by-side compat check: swap in the stock TransformControls with the
 // exact same call sites (attach/setMode/setSpace/snaps/events)
 const compareBox = document.getElementById('compare') as HTMLInputElement
+function stockHelper(controls: object): Object3D {
+  const c = controls as { getHelper?: () => Object3D }
+  return c.getHelper ? c.getHelper() : (controls as Object3D)
+}
 let stock: import('three/examples/jsm/controls/TransformControls.js').TransformControls | null = null
 compareBox.onchange = async () => {
   if (compareBox.checked) {
@@ -162,11 +166,12 @@ compareBox.onchange = async () => {
     stock.addEventListener('dragging-changed', ((e: { value: boolean }) => {
       orbit.enabled = !e.value
     }) as never)
-    // three <=r168: the controls object is itself the helper Object3D
-    scene.add(stock as unknown as Object3D)
+    // three >=r169 exposes the visual via getHelper(); before that the
+    // controls object is itself the helper Object3D
+    scene.add(stockHelper(stock))
     gizmo.detach()
   } else if (stock) {
-    scene.remove(stock as unknown as Object3D)
+    scene.remove(stockHelper(stock))
     stock.detach()
     stock.dispose()
     stock = null
