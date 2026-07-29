@@ -93,7 +93,7 @@ export const defaultTheme: GizmoTheme = {
     planeOffset: 0.45,
     planeSize: 0.22,
     ringRadius: 0.75,
-    ringTube: 0.015,
+    ringTube: 0.0075,
     screenRingRadius: 0.95,
     scaleCubeSize: 0.1,
     scaleHandleDistance: 0.8,
