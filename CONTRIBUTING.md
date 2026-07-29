@@ -49,7 +49,7 @@ New interaction behavior should come with a test in the latter file.
 
 The package is published to npm as `@voluma/three-transform-gizmo` by the
 `Release` workflow (`.github/workflows/release.yml`), which runs when a GitHub
-Release is published. It publishes with `--provenance`, so npm attests that the
+Release is published. It publishes with provenance, so npm attests that the
 tarball was built from that commit in CI.
 
 1. Update `CHANGELOG.md`: move the entries under a new version heading and add
@@ -62,10 +62,24 @@ tarball was built from that commit in CI.
 
 ### One-time setup
 
-- An npm granular access token with publish rights on the `@voluma` scope,
-  stored as the repository secret `NPM_TOKEN`.
-- The `@voluma` npm organization must exist and the publishing account must be a
-  member of it.
+Authentication uses **npm Trusted Publishing** (OIDC): npm verifies that the
+publish comes from this workflow in this repository, so there is **no
+`NPM_TOKEN` secret to store, rotate or leak**.
 
-Publishing manually (`npm publish`) also works and runs the same checks through
-`prepublishOnly`, but skips provenance — prefer the workflow.
+On npmjs.com → `@voluma/three-transform-gizmo` → Settings → Trusted Publisher,
+add a GitHub Actions publisher with:
+
+| Field        | Value                   |
+| ------------ | ----------------------- |
+| Organization | `Voluma-ai`             |
+| Repository   | `three-transform-gizmo` |
+| Workflow     | `release.yml`           |
+
+Trusted publishing can only be configured on a package that already exists, so
+the very first version had to be published manually. Every release after that
+goes through the workflow.
+
+Publishing manually (`npm publish`) still works and runs the same checks through
+`prepublishOnly`, but it publishes from your working directory rather than a
+clean checkout — uncommitted changes end up in the tarball — and it skips
+provenance. Prefer the workflow.
