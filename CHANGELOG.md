@@ -9,11 +9,11 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Added
 
 - `scaleAnchor` option (`'opposite' | 'center'`, constructor + `setScaleAnchor()`
-  + property) selecting whether a scale drag pins the face opposite the grabbed
-  handle or the object's origin. <kbd>Alt</kbd> now selects whichever anchor the
-  gizmo is *not* configured for, so `'center'` gives scaling that never moves the
-  object, with extrude on demand. Defaults to `'opposite'`, so existing
-  behaviour is unchanged.
+  - property) selecting whether a scale drag pins the face opposite the grabbed
+    handle or the object's origin. <kbd>Alt</kbd> now selects whichever anchor the
+    gizmo is _not_ configured for, so `'center'` gives scaling that never moves the
+    object, with extrude on demand. Defaults to `'opposite'`, so existing
+    behaviour is unchanged.
 
 ### Fixed
 

@@ -105,12 +105,12 @@ modifier mid-drag never causes a jump.
 
 ### `new TransformGizmo(camera, domElement, options?)`
 
-| Parameter       | Type           | Description                                           |
-| --------------- | -------------- | ----------------------------------------------------- |
-| `camera`        | `Camera`       | perspective or orthographic; may be parented to a rig |
-| `domElement`    | `HTMLElement`  | usually `renderer.domElement`                         |
-| `options.theme` | `PartialTheme` | deep-merged over the defaults                         |
-| `options.scaleAnchor` | `ScaleAnchor` | `'opposite'` (default, extrude) or `'center'`      |
+| Parameter             | Type           | Description                                           |
+| --------------------- | -------------- | ----------------------------------------------------- |
+| `camera`              | `Camera`       | perspective or orthographic; may be parented to a rig |
+| `domElement`          | `HTMLElement`  | usually `renderer.domElement`                         |
+| `options.theme`       | `PartialTheme` | deep-merged over the defaults                         |
+| `options.scaleAnchor` | `ScaleAnchor`  | `'opposite'` (default, extrude) or `'center'`         |
 
 ### Methods
 
