@@ -63,7 +63,7 @@
     "*.{js,json,md,yml,yaml}": "prettier --write"
   },
   "scripts": {
-    "prepare": "husky",
+    "prepare": "husky || true",
     "dev": "vite demo",
     "build": "tsup",
     "test": "vitest run",
@@ -74,8 +74,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "check": "npm run typecheck && npm run lint && npm run test",
-    "prepublishOnly": "npm run check && npm run build",
-    "prepare": "husky"
+    "prepublishOnly": "npm run check && npm run build"
   },
   "peerDependencies": {
     "three": ">=0.156.0"
