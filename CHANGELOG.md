@@ -8,6 +8,12 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- <kbd>Shift</kbd> during a scale drag constrains proportions: every axis takes
+  the ratio derived from the dragged axes (their mean, for plane handles)
+  instead of only the dragged axes changing. The anchor still belongs to the
+  dragged axes, so the grabbed face stays pinned while the axes that come along
+  grow about the origin. Composes with <kbd>Alt</kbd>, and is a no-op on the
+  centre cube, which already scales uniformly.
 - `scaleAnchor` option (`'opposite' | 'center'`, constructor + `setScaleAnchor()`
   - property) selecting whether a scale drag pins the face opposite the grabbed
     handle or the object's origin. <kbd>Alt</kbd> now selects whichever anchor the

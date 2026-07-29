@@ -66,6 +66,50 @@ describe('computeAnchoredScale', () => {
     expect(position.length()).toBeCloseTo(0)
   })
 
+  it('proportional (Shift): one ratio on every axis, dragged face still pinned', () => {
+    const input = baseInput({ offsetWorld: new Vector3(0.5, 0, 0), proportional: true })
+    const { scale, position } = computeAnchoredScale(input)
+    expect(scale.x).toBeCloseTo(1.5)
+    expect(scale.y).toBeCloseTo(1.5)
+    expect(scale.z).toBeCloseTo(1.5)
+    // the grabbed axis keeps its anchor; y/z simply grow about the origin
+    const before = localToWorld(new Vector3(-0.5, 0, 0), input.positionStart, new Quaternion(), input.scaleStart)
+    const after = localToWorld(new Vector3(-0.5, 0, 0), position, new Quaternion(), scale)
+    expect(after.distanceTo(before)).toBeLessThan(1e-10)
+    expect(position.y).toBeCloseTo(0)
+    expect(position.z).toBeCloseTo(0)
+  })
+
+  it('proportional + center-anchored: grows every axis without moving', () => {
+    const input = baseInput({ offsetWorld: new Vector3(0.5, 0, 0), proportional: true, centerAnchored: true })
+    const { scale, position } = computeAnchoredScale(input)
+    expect(scale.x).toBeCloseTo(1.5)
+    expect(scale.z).toBeCloseTo(1.5)
+    expect(position.length()).toBeCloseTo(0)
+  })
+
+  it('proportional on a plane handle averages the dragged axes', () => {
+    // +XY dragged purely along +x: x sees the full ratio, y sees none
+    const input = baseInput({ handle: '+XY' as AxisId, offsetWorld: new Vector3(0.5, 0, 0), proportional: true })
+    const { scale } = computeAnchoredScale(input)
+    const expected = (1.5 + 1) / 2
+    expect(scale.x).toBeCloseTo(expected)
+    expect(scale.y).toBeCloseTo(expected)
+    expect(scale.z).toBeCloseTo(expected)
+  })
+
+  it('proportional keeps mirrored axes mirrored', () => {
+    const input = baseInput({
+      offsetWorld: new Vector3(0.5, 0, 0),
+      proportional: true,
+      scaleStart: new Vector3(1, -2, 1),
+      worldScaleStart: new Vector3(1, -2, 1),
+    })
+    const { scale } = computeAnchoredScale(input)
+    expect(scale.x).toBeCloseTo(1.5)
+    expect(scale.y).toBeCloseTo(-3)
+  })
+
   it('rotated object: anchor invariant holds in world space', () => {
     const q = new Quaternion().setFromAxisAngle(new Vector3(0, 0, 1), Math.PI / 4)
     // drag along the world direction of local +X

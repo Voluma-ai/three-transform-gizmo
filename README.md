@@ -11,7 +11,8 @@ angle feedback**, and **themeable styling**.
 - **Extrude scaling.** Handles sit on _both_ ends of every axis and on both
   corners of every plane. Dragging a handle anchors the opposite face/corner in
   world space, so the object grows in one direction — like face-dragging in
-  Blender — instead of scaling around its center. Hold <kbd>Alt</kbd> to scale
+  Blender — instead of scaling around its center. Hold <kbd>Shift</kbd> to
+  constrain proportions, or <kbd>Alt</kbd> to scale
   from the center instead. A center cube scales uniformly.
 - **Per-plane scaling.** `+XY`, `-XZ`, … handles scale two axes at once,
   anchored on the opposite corner.
@@ -94,6 +95,7 @@ gizmo.setScaleSnap(0.25)
 | Drag a plane quad (scale)              | extrude two axes — the opposite corner stays put                         |
 | Drag the center cube (scale)           | uniform scale from the center                                            |
 | <kbd>Alt</kbd> + scale drag            | use the anchor `scaleAnchor` is not set to (default: scale from center)  |
+| <kbd>Shift</kbd> + scale drag          | constrain proportions — every axis takes the dragged axis' ratio         |
 | <kbd>Shift</kbd> + rotate drag         | snap to `theme.snapping.shiftRotationSnapDeg` (default 15°)              |
 
 Modifier keys are read from the pointer event, so they take effect on the next

@@ -592,6 +592,9 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
       // face to pin — shifting by a guessed extent would just slide the object.
       centerAnchored:
         (this._scaleAnchor === 'center' ? !this._altKey : this._altKey) || drag.axis === 'XYZ' || !drag.boundsKnown,
+      // Shift constrains proportions, as in most 2D and 3D editors. The center
+      // cube already scales every axis, so the modifier is a no-op there.
+      proportional: this._shiftKey,
       scaleSnap: this.scaleSnap,
     })
     object.scale.copy(scale)
