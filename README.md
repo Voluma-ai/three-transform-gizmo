@@ -1,7 +1,7 @@
-# three-transform-gizmo
+# @voluma/three-transform-gizmo
 
 [![CI](https://github.com/Voluma-ai/three-transform-gizmo/actions/workflows/ci.yml/badge.svg)](https://github.com/Voluma-ai/three-transform-gizmo/actions/workflows/ci.yml)
-[![npm](https://img.shields.io/npm/v/three-transform-gizmo.svg)](https://www.npmjs.com/package/three-transform-gizmo)
+[![npm](https://img.shields.io/npm/v/@voluma/three-transform-gizmo.svg)](https://www.npmjs.com/package/@voluma/three-transform-gizmo)
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 
 A custom transform gizmo for [three.js](https://threejs.org) — a near drop-in
@@ -29,7 +29,7 @@ objects — the anchor is derived from the object's local bounding box.
 ## Installation
 
 ```bash
-npm install three-transform-gizmo three
+npm install @voluma/three-transform-gizmo three
 ```
 
 `three` is a peer dependency (`>=0.156.0`). TypeScript users should also install
@@ -43,7 +43,7 @@ npm install -D @types/three
 
 ```ts
 import * as THREE from 'three'
-import { TransformGizmo } from 'three-transform-gizmo'
+import { TransformGizmo } from '@voluma/three-transform-gizmo'
 
 const scene = new THREE.Scene()
 const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 100)
@@ -164,7 +164,7 @@ The sign is the grabbed side; the opposite side is the anchor.
 ## Theming
 
 ```ts
-import { TransformGizmo, defaultTheme } from 'three-transform-gizmo'
+import { TransformGizmo, defaultTheme } from '@voluma/three-transform-gizmo'
 
 const gizmo = new TransformGizmo(camera, renderer.domElement, {
   theme: {
