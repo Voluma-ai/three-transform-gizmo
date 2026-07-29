@@ -6,14 +6,16 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-07-29
+
 ### Added
 
-- `scaleAnchor` option (`'opposite' | 'center'`, constructor + `setScaleAnchor()`
-  - property) selecting whether a scale drag pins the face opposite the grabbed
-    handle or the object's origin. <kbd>Alt</kbd> now selects whichever anchor the
-    gizmo is _not_ configured for, so `'center'` gives scaling that never moves the
-    object, with extrude on demand. Defaults to `'opposite'`, so existing
-    behaviour is unchanged.
+- `scaleAnchor` option (`'opposite' | 'center'`, constructor option,
+  `setScaleAnchor()` and property) selecting whether a scale drag pins the face
+  opposite the grabbed handle or the object's origin. <kbd>Alt</kbd> now selects
+  whichever anchor the gizmo is _not_ configured for, so `'center'` gives
+  scaling that never moves the object, with extrude on demand. Defaults to
+  `'opposite'`, so existing behaviour is unchanged.
 
 ### Fixed
 
@@ -21,6 +23,15 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   no longer shifts its position. The anchor previously fell back to a guessed
   unit-cube extent and slid the object by an arbitrary amount; such objects now
   scale about their origin.
+- Removed a duplicated `prepare` script entry in `package.json`, which made
+  every build emit a `duplicate-object-key` warning. The remaining entry is
+  guarded as `husky || true` so installing this package from a git URL does not
+  fail when husky is absent.
+
+### Changed
+
+- Releases are now published from CI using npm Trusted Publishing (OIDC) on
+  Node 24, instead of a stored npm token. Provenance is attested automatically.
 
 ## [0.1.0] - 2026-07-29
 
@@ -48,5 +59,6 @@ Initial release, published to npm as `@voluma/three-transform-gizmo`.
   `latest`.
 - Ships ESM and CJS builds with TypeScript declarations for both.
 
-[Unreleased]: https://github.com/Voluma-ai/three-transform-gizmo/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/Voluma-ai/three-transform-gizmo/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/Voluma-ai/three-transform-gizmo/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/Voluma-ai/three-transform-gizmo/releases/tag/v0.1.0
