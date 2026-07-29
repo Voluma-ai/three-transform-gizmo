@@ -6,6 +6,13 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Live degrees readout inside the rotation angle sector: while dragging a
+  rotate ring, the swept angle is shown in full-circle degrees (e.g. `45°`,
+  `-120°`) on the sector's bisector, billboarded toward the camera. Themeable
+  via `colors.sectorLabel` and `sizes.sectorLabelSize`.
+
 ## [0.2.0] - 2026-07-29
 
 ### Added

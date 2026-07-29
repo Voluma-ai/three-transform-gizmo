@@ -1,17 +1,22 @@
 import { BufferAttribute, BufferGeometry, DoubleSide, Mesh, MeshBasicMaterial } from 'three'
 import type { GizmoTheme } from '../theme'
+import { AngleLabel } from './AngleLabel'
 
 const MAX_SEGMENTS = 128
+/** label sits on the sector's bisector, at this fraction of the radius */
+const LABEL_RADIUS = 0.55
 
 /**
  * Semi-transparent "pie slice" showing the swept rotation angle during a
- * rotate drag. Geometry is preallocated; update() rewrites positions and
- * adjusts drawRange (no per-frame allocation). The sector lies in the local
- * XY plane from angle 0 (start direction) to the current swept angle; the
- * parent orients it into the rotation plane.
+ * rotate drag, with a degrees readout on its bisector. Geometry is
+ * preallocated; update() rewrites positions and adjusts drawRange (no
+ * per-frame allocation). The sector lies in the local XY plane from angle 0
+ * (start direction) to the current swept angle; the parent orients it into
+ * the rotation plane.
  */
 export class AngleSector extends Mesh<BufferGeometry, MeshBasicMaterial> {
   private radius = 1
+  private label: AngleLabel
 
   constructor(theme: GizmoTheme) {
     const geometry = new BufferGeometry()
@@ -32,6 +37,8 @@ export class AngleSector extends Mesh<BufferGeometry, MeshBasicMaterial> {
     this.renderOrder = theme.renderOrder - 1
     this.visible = false
     this.frustumCulled = false
+    this.label = new AngleLabel(theme)
+    this.add(this.label)
   }
 
   setRadius(r: number): void {
@@ -61,6 +68,16 @@ export class AngleSector extends Mesh<BufferGeometry, MeshBasicMaterial> {
     }
     attr.needsUpdate = true
     this.geometry.setDrawRange(0, segments * 3)
+
+    // degrees readout on the sector's bisector (full-circle degrees, signed)
+    const deg = (angle * 180) / Math.PI
+    let text = deg.toFixed(1)
+    if (text.endsWith('.0')) text = text.slice(0, -2)
+    if (text === '-0') text = '0'
+    this.label.setText(`${text}°`)
+    const mid = a / 2
+    this.label.position.set(Math.cos(mid) * r * LABEL_RADIUS, Math.sin(mid) * r * LABEL_RADIUS, 0)
+
     this.visible = true
   }
 
@@ -72,5 +89,6 @@ export class AngleSector extends Mesh<BufferGeometry, MeshBasicMaterial> {
   dispose(): void {
     this.geometry.dispose()
     this.material.dispose()
+    this.label.dispose()
   }
 }

@@ -15,6 +15,8 @@ export interface GizmoTheme {
     active: number
     /** rotation angle sector fill */
     sector: number
+    /** degrees readout shown inside the angle sector */
+    sectorLabel: number
   }
   opacity: {
     idle: number
@@ -41,6 +43,8 @@ export interface GizmoTheme {
     scaleHandleDistance: number
     /** scale factor for invisible picker hit areas */
     pickerScale: number
+    /** text height of the degrees readout, in gizmo units */
+    sectorLabelSize: number
   }
   snapping: {
     /** rotation snap in degrees applied while Shift is held */
@@ -63,6 +67,7 @@ export const defaultTheme: GizmoTheme = {
     hover: 0xffd60a,
     active: 0xffd60a,
     sector: 0xffd60a,
+    sectorLabel: 0xffd60a,
   },
   opacity: {
     idle: 1.0,
@@ -85,6 +90,7 @@ export const defaultTheme: GizmoTheme = {
     scaleCubeSize: 0.1,
     scaleHandleDistance: 0.8,
     pickerScale: 2.5,
+    sectorLabelSize: 0.16,
   },
   snapping: {
     shiftRotationSnapDeg: 15,

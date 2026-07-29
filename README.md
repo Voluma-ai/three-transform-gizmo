@@ -17,9 +17,9 @@ angle feedback**, and **themeable styling**.
 - **Per-plane scaling.** `+XY`, `-XZ`, … handles scale two axes at once,
   anchored on the opposite corner.
 - **Rotation with angle feedback.** Three axis rings plus a screen-space ring,
-  with a translucent "pie slice" showing the swept angle while dragging. Hold
-  <kbd>Shift</kbd> for 15° snapping (configurable), or set a permanent
-  `rotationSnap`.
+  with a translucent "pie slice" showing the swept angle while dragging and a
+  live degrees readout (e.g. `45°`) inside it. Hold <kbd>Shift</kbd> for 15°
+  snapping (configurable), or set a permanent `rotationSnap`.
 - **Themeable.** Colors, opacities and geometry sizes come from a theme object
   that can be swapped at runtime.
 
@@ -193,6 +193,7 @@ rather than every frame.
 | `uniform`          | `0xffffff`                           | uniform-scale center cube                     |
 | `hover` / `active` | `0xffd60a`                           | hovered / dragged handle tint                 |
 | `sector`           | `0xffd60a`                           | rotation angle sector fill                    |
+| `sectorLabel`      | `0xffd60a`                           | degrees readout inside the angle sector       |
 
 | `opacity`                   | Default |                                      |
 | --------------------------- | ------- | ------------------------------------ |
@@ -210,6 +211,7 @@ rather than every frame.
 | `screenRingRadius`                                    | `0.95`                 | outer screen-space ring                |
 | `scaleCubeSize` / `scaleHandleDistance`               | `0.1` / `0.8`          | scale handles                          |
 | `pickerScale`                                         | `2.5`                  | invisible hit-area multiplier          |
+| `sectorLabelSize`                                     | `0.16`                 | degrees readout text height            |
 
 | Other                           | Default |                                            |
 | ------------------------------- | ------- | ------------------------------------------ |
