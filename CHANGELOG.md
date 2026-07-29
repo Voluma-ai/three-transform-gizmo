@@ -6,9 +6,9 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-## [0.1.0] - 2026-07-25
+## [0.1.0] - 2026-07-29
 
-Initial release.
+Initial release, published to npm as `@voluma/three-transform-gizmo`.
 
 ### Added
 
@@ -25,6 +25,12 @@ Initial release.
 - Themeable styling via `GizmoTheme` (colors, opacities, sizes, snapping,
   render order), hot-swappable with `setTheme()`.
 - Extra `hoveron` / `hoveroff` events beyond the `TransformControls` set.
+
+### Compatibility
+
+- Requires `three >= 0.156.0` as a peer dependency. CI covers 0.156, 0.185 and
+  `latest`.
+- Ships ESM and CJS builds with TypeScript declarations for both.
 
 [Unreleased]: https://github.com/Voluma-ai/three-transform-gizmo/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/Voluma-ai/three-transform-gizmo/releases/tag/v0.1.0
