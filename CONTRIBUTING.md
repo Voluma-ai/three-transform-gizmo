@@ -47,7 +47,25 @@ New interaction behavior should come with a test in the latter file.
 
 ## Releasing
 
-1. Update `CHANGELOG.md` under a new version heading.
-2. `npm version <major|minor|patch>`
-3. `npm publish` (runs `prepublishOnly`: check + build)
-4. `git push --follow-tags`
+The package is published to npm as `@voluma/three-transform-gizmo` by the
+`Release` workflow (`.github/workflows/release.yml`), which runs when a GitHub
+Release is published. It publishes with `--provenance`, so npm attests that the
+tarball was built from that commit in CI.
+
+1. Update `CHANGELOG.md`: move the entries under a new version heading and add
+   the compare links at the bottom.
+2. `npm version <major|minor|patch>` — bumps `package.json` and creates the tag.
+3. `git push --follow-tags`
+4. Create a GitHub Release for that tag (Releases → Draft a new release). The
+   workflow verifies the tag matches `package.json`, runs `npm run check` and
+   `npm run build`, then publishes.
+
+### One-time setup
+
+- An npm granular access token with publish rights on the `@voluma` scope,
+  stored as the repository secret `NPM_TOKEN`.
+- The `@voluma` npm organization must exist and the publishing account must be a
+  member of it.
+
+Publishing manually (`npm publish`) also works and runs the same checks through
+`prepublishOnly`, but skips provenance — prefer the workflow.
