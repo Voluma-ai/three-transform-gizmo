@@ -43,19 +43,27 @@ export interface GizmoTheme {
     scaleHandleDistance: number
     /** scale factor for invisible picker hit areas */
     pickerScale: number
-    /** text height of the degrees readout, in gizmo units */
+    /**
+     * Relative height of the degrees readout (gizmo units). Only used when
+     * `showSectorLabel` is true.
+     */
     sectorLabelSize: number
   }
   snapping: {
     /** rotation snap in degrees applied while Shift is held */
     shiftRotationSnapDeg: number
   }
+  /**
+   * When true, show a degrees readout (e.g. `45°`) inside the rotation angle
+   * sector while dragging. Off by default.
+   */
+  showSectorLabel: boolean
   renderOrder: number
 }
 
 export type PartialTheme = {
-  [K in keyof GizmoTheme]?: Partial<GizmoTheme[K]>
-} & { renderOrder?: number }
+  [K in keyof GizmoTheme]?: GizmoTheme[K] extends object ? Partial<GizmoTheme[K]> : GizmoTheme[K]
+}
 
 export const defaultTheme: GizmoTheme = {
   colors: {
@@ -95,6 +103,7 @@ export const defaultTheme: GizmoTheme = {
   snapping: {
     shiftRotationSnapDeg: 15,
   },
+  showSectorLabel: false,
   renderOrder: 999,
 }
 
@@ -104,6 +113,7 @@ export function mergeTheme(base: GizmoTheme, partial?: PartialTheme): GizmoTheme
     opacity: { ...base.opacity, ...partial?.opacity },
     sizes: { ...base.sizes, ...partial?.sizes },
     snapping: { ...base.snapping, ...partial?.snapping },
+    showSectorLabel: partial?.showSectorLabel ?? base.showSectorLabel,
     renderOrder: partial?.renderOrder ?? base.renderOrder,
   }
 }
