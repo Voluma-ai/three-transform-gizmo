@@ -6,6 +6,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-07-29
+
 ### Changed
 
 - Rotate rings are half as thick by default: `theme.sizes.ringTube` is now
@@ -73,7 +75,8 @@ Initial release, published to npm as `@voluma/three-transform-gizmo`.
   `latest`.
 - Ships ESM and CJS builds with TypeScript declarations for both.
 
-[Unreleased]: https://github.com/Voluma-ai/three-transform-gizmo/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/Voluma-ai/three-transform-gizmo/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/Voluma-ai/three-transform-gizmo/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/Voluma-ai/three-transform-gizmo/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/Voluma-ai/three-transform-gizmo/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/Voluma-ai/three-transform-gizmo/releases/tag/v0.1.0
