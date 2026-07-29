@@ -247,7 +247,7 @@ A typical migration is two lines: construct `TransformGizmo` instead of
 
 ## Compatibility
 
-- three.js `>=0.156.0` (CI covers 0.156, 0.166, and `latest`).
+- three.js `>=0.156.0` (CI covers 0.156, 0.185, and `latest`).
 - Node `>=18` for the toolchain; the library itself is browser code with no
   runtime dependencies beyond three.
 - Ships ESM and CJS builds with TypeScript declarations for both.
