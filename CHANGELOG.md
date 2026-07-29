@@ -6,12 +6,15 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-07-29
+
 ### Added
 
-- Live degrees readout inside the rotation angle sector: while dragging a
-  rotate ring, the swept angle is shown in full-circle degrees (e.g. `45°`,
-  `-120°`) on the sector's bisector, billboarded toward the camera. Themeable
-  via `colors.sectorLabel` and `sizes.sectorLabelSize`.
+- Optional live degrees readout inside the rotation angle sector: enable with
+  `theme.showSectorLabel` (off by default). While dragging a rotate ring, the
+  swept angle is shown in full-circle degrees (e.g. `45°`, `-120°`) on the
+  sector's bisector, billboarded toward the camera. Themeable via
+  `colors.sectorLabel` and relative size via `sizes.sectorLabelSize`.
 
 ## [0.2.0] - 2026-07-29
 
@@ -63,6 +66,7 @@ Initial release, published to npm as `@voluma/three-transform-gizmo`.
   `latest`.
 - Ships ESM and CJS builds with TypeScript declarations for both.
 
-[Unreleased]: https://github.com/Voluma-ai/three-transform-gizmo/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/Voluma-ai/three-transform-gizmo/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/Voluma-ai/three-transform-gizmo/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/Voluma-ai/three-transform-gizmo/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/Voluma-ai/three-transform-gizmo/releases/tag/v0.1.0

@@ -131,19 +131,40 @@ for (const a of ['X', 'Y', 'Z'] as const) {
 }
 
 const themeBox = document.getElementById('theme') as HTMLInputElement
-themeBox.onchange = () => {
+const degreesBox = document.getElementById('degrees') as HTMLInputElement
+function applyTheme() {
   gizmo.setTheme(
     themeBox.checked
       ? {
-          colors: { x: 0xff6b9d, y: 0xa8e063, z: 0x56ccf2, hover: 0xffffff, active: 0xffffff, sector: 0x56ccf2 },
+          colors: {
+            x: 0xff6b9d,
+            y: 0xa8e063,
+            z: 0x56ccf2,
+            hover: 0xffffff,
+            active: 0xffffff,
+            sector: 0x56ccf2,
+            sectorLabel: 0x56ccf2,
+          },
           sizes: { scaleCubeSize: 0.13, ringTube: 0.025, arrowHeadRadius: 0.08 },
+          showSectorLabel: degreesBox.checked,
         }
       : {
-          colors: { x: 0xe5484d, y: 0x30a46c, z: 0x0091ff, hover: 0xffd60a, active: 0xffd60a, sector: 0xffd60a },
+          colors: {
+            x: 0xe5484d,
+            y: 0x30a46c,
+            z: 0x0091ff,
+            hover: 0xffd60a,
+            active: 0xffd60a,
+            sector: 0xffd60a,
+            sectorLabel: 0xffd60a,
+          },
           sizes: { scaleCubeSize: 0.1, ringTube: 0.015, arrowHeadRadius: 0.06 },
+          showSectorLabel: degreesBox.checked,
         },
   )
 }
+themeBox.onchange = applyTheme
+degreesBox.onchange = applyTheme
 
 // side-by-side compat check: swap in the stock TransformControls with the
 // exact same call sites (attach/setMode/setSpace/snaps/events)

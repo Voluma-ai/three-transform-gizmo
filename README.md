@@ -17,9 +17,10 @@ angle feedback**, and **themeable styling**.
 - **Per-plane scaling.** `+XY`, `-XZ`, … handles scale two axes at once,
   anchored on the opposite corner.
 - **Rotation with angle feedback.** Three axis rings plus a screen-space ring,
-  with a translucent "pie slice" showing the swept angle while dragging and a
-  live degrees readout (e.g. `45°`) inside it. Hold <kbd>Shift</kbd> for 15°
-  snapping (configurable), or set a permanent `rotationSnap`.
+  with a translucent "pie slice" showing the swept angle while dragging. Opt in
+  to a live degrees readout (e.g. `45°`) via `theme.showSectorLabel`. Hold
+  <kbd>Shift</kbd> for 15° snapping (configurable), or set a permanent
+  `rotationSnap`.
 - **Themeable.** Colors, opacities and geometry sizes come from a theme object
   that can be swapped at runtime.
 
@@ -173,8 +174,9 @@ import { TransformGizmo, defaultTheme } from '@voluma/three-transform-gizmo'
 const gizmo = new TransformGizmo(camera, renderer.domElement, {
   theme: {
     colors: { x: 0xff6b9d, y: 0xa8e063, z: 0x56ccf2, hover: 0xffffff },
-    sizes: { scaleCubeSize: 0.13, ringTube: 0.025 },
+    sizes: { scaleCubeSize: 0.13, ringTube: 0.025, sectorLabelSize: 0.2 },
     snapping: { shiftRotationSnapDeg: 5 },
+    showSectorLabel: true, // opt in to degrees readout while rotating
   },
 })
 
@@ -201,22 +203,23 @@ rather than every frame.
 | `inactiveWhileDragging`     | `0.15`  | other handles fade out during a drag |
 | `sector`                    | `0.25`  | angle sector fill                    |
 
-| `sizes`                                               | Default                |                                        |
-| ----------------------------------------------------- | ---------------------- | -------------------------------------- |
-| `gizmoSize`                                           | `1`                    | base multiplier (combined with `size`) |
-| `arrowLength` / `arrowHeadLength` / `arrowHeadRadius` | `0.8` / `0.2` / `0.06` | translate arrows                       |
-| `axisLineRadius`                                      | `0.0125`               | axis shaft thickness                   |
-| `planeOffset` / `planeSize`                           | `0.45` / `0.22`        | plane handle placement and size        |
-| `ringRadius` / `ringTube`                             | `0.75` / `0.015`       | rotate rings                           |
-| `screenRingRadius`                                    | `0.95`                 | outer screen-space ring                |
-| `scaleCubeSize` / `scaleHandleDistance`               | `0.1` / `0.8`          | scale handles                          |
-| `pickerScale`                                         | `2.5`                  | invisible hit-area multiplier          |
-| `sectorLabelSize`                                     | `0.16`                 | degrees readout text height            |
+| `sizes`                                               | Default                |                                                    |
+| ----------------------------------------------------- | ---------------------- | -------------------------------------------------- |
+| `gizmoSize`                                           | `1`                    | base multiplier (combined with `size`)             |
+| `arrowLength` / `arrowHeadLength` / `arrowHeadRadius` | `0.8` / `0.2` / `0.06` | translate arrows                                   |
+| `axisLineRadius`                                      | `0.0125`               | axis shaft thickness                               |
+| `planeOffset` / `planeSize`                           | `0.45` / `0.22`        | plane handle placement and size                    |
+| `ringRadius` / `ringTube`                             | `0.75` / `0.015`       | rotate rings                                       |
+| `screenRingRadius`                                    | `0.95`                 | outer screen-space ring                            |
+| `scaleCubeSize` / `scaleHandleDistance`               | `0.1` / `0.8`          | scale handles                                      |
+| `pickerScale`                                         | `2.5`                  | invisible hit-area multiplier                      |
+| `sectorLabelSize`                                     | `0.16`                 | relative degrees-readout text height (gizmo units) |
 
-| Other                           | Default |                                            |
-| ------------------------------- | ------- | ------------------------------------------ |
-| `snapping.shiftRotationSnapDeg` | `15`    | <kbd>Shift</kbd> rotation snap             |
-| `renderOrder`                   | `999`   | handles render on top (`depthTest: false`) |
+| Other                           | Default |                                                             |
+| ------------------------------- | ------- | ----------------------------------------------------------- |
+| `showSectorLabel`               | `false` | show degrees readout inside the angle sector while rotating |
+| `snapping.shiftRotationSnapDeg` | `15`    | <kbd>Shift</kbd> rotation snap                              |
+| `renderOrder`                   | `999`   | handles render on top (`depthTest: false`)                  |
 
 ## Migrating from `TransformControls`
 

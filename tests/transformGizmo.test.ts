@@ -185,6 +185,27 @@ describe('rotate', () => {
     up({ x: pt.x + 40, y: pt.y + 15 })
     expect(sector?.visible).toBe(false)
   })
+
+  it('keeps the degrees label hidden unless showSectorLabel is enabled', () => {
+    gizmo.setMode('rotate')
+    const pt = handlePoint(Y, 0.75)
+    down(pt)
+    move({ x: pt.x + 40, y: pt.y + 15 })
+    const sector = gizmo.children.find((c) => c.type === 'Mesh')!
+    const label = sector.children[0]!
+    expect(gizmo.getTheme().showSectorLabel).toBe(false)
+    expect(label.visible).toBe(false)
+    up({ x: pt.x + 40, y: pt.y + 15 })
+
+    gizmo.setTheme({ showSectorLabel: true, sizes: { sectorLabelSize: 0.2 } })
+    expect(gizmo.getTheme().showSectorLabel).toBe(true)
+    expect(gizmo.getTheme().sizes.sectorLabelSize).toBe(0.2)
+    down(pt)
+    move({ x: pt.x + 40, y: pt.y + 15 })
+    const sectorOn = gizmo.children.find((c) => c.type === 'Mesh')!
+    expect(sectorOn.children[0]!.visible).toBe(true)
+    up({ x: pt.x + 40, y: pt.y + 15 })
+  })
 })
 
 describe('scale (extrude)', () => {
