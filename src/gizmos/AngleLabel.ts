@@ -36,6 +36,12 @@ export class AngleLabel extends Sprite {
       if (ctx) {
         this.ctx = ctx
         this.texture = new CanvasTexture(canvas)
+        // Upload without the flip pixel-store and draw pre-flipped instead (see
+        // setText). Splat renderers (e.g. Spark) call gl.pixelStorei(UNPACK_FLIP_Y)
+        // directly on the shared context, desyncing three's cached pixel-store
+        // state; a flipY upload then gets silently skipped and the text renders
+        // upside down. A flip-free upload is correct regardless of that state.
+        this.texture.flipY = false
         this.texture.minFilter = LinearFilter
         this.material.map = this.texture
       }
@@ -50,6 +56,10 @@ export class AngleLabel extends Sprite {
     if (!ctx || text === this.lastText) return
     this.lastText = text
     ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
+    ctx.save()
+    // draw mirrored vertically to match the flip-free upload (flipY = false)
+    ctx.translate(0, CANVAS_HEIGHT)
+    ctx.scale(1, -1)
     ctx.font = FONT
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
@@ -60,6 +70,7 @@ export class AngleLabel extends Sprite {
     ctx.strokeText(text, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2)
     ctx.fillStyle = this.fillStyle
     ctx.fillText(text, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2)
+    ctx.restore()
     this.texture!.needsUpdate = true
   }
 

@@ -6,12 +6,24 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-07-29
+
 ### Added
 
 - Translate arrows now appear on both ends of each axis, so an object can be
   dragged from either side. Matching three.js `TransformControls`, only the
   positive side draws a shaft — the negative side is the arrow head alone. Both
   heads report the same axis, so dragging either behaves identically.
+
+### Fixed
+
+- The degrees readout no longer renders upside down when the host page also
+  runs a renderer that touches `gl.pixelStorei(UNPACK_FLIP_Y_WEBGL)` directly
+  on the shared context (e.g. Spark's splat sorter). Such calls desync
+  three.js's cached pixel-store state, silently skipping the flip on the
+  label's canvas upload. The label now uploads flip-free (`flipY = false`) and
+  draws its text pre-flipped instead, which is correct regardless of that
+  external state — on WebGL, WebGPU and the WebGL2 fallback alike.
 
 ## [0.4.0] - 2026-07-29
 
@@ -86,7 +98,8 @@ Initial release, published to npm as `@voluma/three-transform-gizmo`.
   `latest`.
 - Ships ESM and CJS builds with TypeScript declarations for both.
 
-[Unreleased]: https://github.com/Voluma-ai/three-transform-gizmo/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/Voluma-ai/three-transform-gizmo/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/Voluma-ai/three-transform-gizmo/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/Voluma-ai/three-transform-gizmo/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/Voluma-ai/three-transform-gizmo/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/Voluma-ai/three-transform-gizmo/compare/v0.1.0...v0.2.0
