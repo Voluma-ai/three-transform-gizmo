@@ -2,6 +2,17 @@ export type GizmoMode = 'translate' | 'rotate' | 'scale'
 export type GizmoSpace = 'world' | 'local'
 
 /**
+ * Where a scale drag anchors.
+ * 'opposite' — extrude: the face opposite the grabbed handle stays fixed in
+ *              world space, so the object's position shifts as it grows.
+ * 'center'   — the object's origin stays fixed, so scaling never changes
+ *              position. Use this when the host app stores position and scale
+ *              separately, or forces uniform scale.
+ * Holding Alt during a drag selects the other mode.
+ */
+export type ScaleAnchor = 'opposite' | 'center'
+
+/**
  * Handle identifiers.
  * Translate: X, Y, Z, XY, XZ, YZ, XYZ (screen-plane center)
  * Rotate:    X, Y, Z, E (screen-space ring)

@@ -226,6 +226,44 @@ describe('scale (extrude)', () => {
     expect(anchorAfter.distanceTo(anchorBefore)).toBeLessThan(1e-6)
   })
 
+  it('leaves the position untouched when the anchor is the center', () => {
+    gizmo.setScaleAnchor('center')
+    gizmo.setMode('scale')
+    drag(handlePoint(X, 0.8), 60, 0)
+    expect(cube.scale.x).toBeGreaterThan(1.05)
+    expect(cube.position.length()).toBeCloseTo(0)
+  })
+
+  it('extrudes when Alt is held and the anchor is the center', () => {
+    gizmo.setScaleAnchor('center')
+    gizmo.setMode('scale')
+    const anchorBefore = new Vector3(-0.5, 0, 0).applyMatrix4(cube.matrixWorld)
+    drag(handlePoint(X, 0.8), 60, 0, { altKey: true })
+    cube.updateWorldMatrix(true, false)
+    const anchorAfter = new Vector3(-0.5, 0, 0).applyMatrix4(cube.matrixWorld)
+    expect(cube.scale.x).toBeGreaterThan(1.05)
+    expect(anchorAfter.distanceTo(anchorBefore)).toBeLessThan(1e-6)
+  })
+
+  it('accepts the anchor through the constructor', () => {
+    const g = new TransformGizmo(camera, el as unknown as HTMLElement, { scaleAnchor: 'center' })
+    expect(g.scaleAnchor).toBe('center')
+    g.dispose()
+  })
+
+  it('falls back to center anchoring when the object has no measurable geometry', () => {
+    // a splat container: nothing to bound, so there is no opposite face to pin
+    const empty = new Group()
+    scene.add(empty)
+    gizmo.attach(empty)
+    gizmo.setMode('scale')
+    gizmo.updateMatrixWorld(true)
+    const pt = toScreen(empty.getWorldPosition(new Vector3()).add(X.clone().multiplyScalar(gizmo.scale.x * 0.8)))
+    drag(pt, 60, 0)
+    expect(empty.scale.x).toBeGreaterThan(1.05)
+    expect(empty.position.length()).toBeCloseTo(0)
+  })
+
   it('keeps mirrored objects mirrored', () => {
     cube.scale.set(-1, 1, 1)
     scene.updateMatrixWorld(true)

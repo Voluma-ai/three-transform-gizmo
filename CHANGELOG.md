@@ -6,6 +6,22 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `scaleAnchor` option (`'opposite' | 'center'`, constructor + `setScaleAnchor()`
+  + property) selecting whether a scale drag pins the face opposite the grabbed
+  handle or the object's origin. <kbd>Alt</kbd> now selects whichever anchor the
+  gizmo is *not* configured for, so `'center'` gives scaling that never moves the
+  object, with extrude on demand. Defaults to `'opposite'`, so existing
+  behaviour is unchanged.
+
+### Fixed
+
+- Scaling an object with no measurable geometry (a splat, an empty container)
+  no longer shifts its position. The anchor previously fell back to a guessed
+  unit-cube extent and slid the object by an arbitrary amount; such objects now
+  scale about their origin.
+
 ## [0.1.0] - 2026-07-29
 
 Initial release, published to npm as `@voluma/three-transform-gizmo`.

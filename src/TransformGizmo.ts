@@ -21,10 +21,12 @@ import { RotateGizmo } from './gizmos/RotateGizmo'
 import { ScaleGizmo } from './gizmos/ScaleGizmo'
 import { TranslateGizmo } from './gizmos/TranslateGizmo'
 import { defaultTheme, mergeTheme, type GizmoTheme, type PartialTheme } from './theme'
-import type { AxisId, GizmoEventMap, GizmoMode, GizmoSpace } from './types'
+import type { AxisId, GizmoEventMap, GizmoMode, GizmoSpace, ScaleAnchor } from './types'
 
 export interface TransformGizmoOptions {
   theme?: PartialTheme
+  /** where scale drags anchor; defaults to 'opposite' (extrude) */
+  scaleAnchor?: ScaleAnchor
 }
 
 interface DragState {
@@ -49,6 +51,8 @@ interface DragState {
   localHalfExtents: Vector3
   localCenterOffset: Vector3
   handleDistanceWorld: number
+  /** false when the object has no measurable geometry, so no anchor can be derived */
+  boundsKnown: boolean
 }
 
 const _pointer = new Vector2()
@@ -95,6 +99,7 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
   private _enabled = true
   private _mode: GizmoMode = 'translate'
   private _space: GizmoSpace = 'world'
+  private _scaleAnchor: ScaleAnchor = 'opposite'
   private _axis: AxisId | null = null
   private _dragging = false
   private _theme: GizmoTheme
@@ -122,6 +127,7 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
     this.camera = camera
     this.domElement = domElement
     this._theme = mergeTheme(defaultTheme, options.theme)
+    if (options.scaleAnchor) this._scaleAnchor = options.scaleAnchor
 
     this._translate = new TranslateGizmo(this._theme)
     this._rotate = new RotateGizmo(this._theme)
@@ -172,6 +178,24 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
     this.endDrag()
     this._space = space
     this.dispatchEvent({ type: 'change' })
+  }
+
+  get scaleAnchor(): ScaleAnchor {
+    return this._scaleAnchor
+  }
+  set scaleAnchor(a: ScaleAnchor) {
+    this.setScaleAnchor(a)
+  }
+  /**
+   * Choose whether scale drags pin the face opposite the grabbed handle
+   * ('opposite', the default extrude behaviour) or the object's origin
+   * ('center', so scaling never moves the object). Holding Alt during a drag
+   * selects the other mode.
+   */
+  setScaleAnchor(anchor: ScaleAnchor): void {
+    if (anchor === this._scaleAnchor) return
+    this.endDrag()
+    this._scaleAnchor = anchor
   }
 
   get axis(): AxisId | null {
@@ -380,8 +404,9 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
     const localHalfExtents = new Vector3()
     const localCenterOffset = new Vector3()
     let handleDistanceWorld = 1
+    let boundsKnown = true
     if (this._mode === 'scale') {
-      this.computeLocalBounds(object, localHalfExtents, localCenterOffset)
+      boundsKnown = this.computeLocalBounds(object, localHalfExtents, localCenterOffset)
       const gizmoScale = (this._factor * this.size * this._theme.sizes.gizmoSize) / 4
       const dist =
         axis === 'XYZ' || axis.replace(/^[+-]/, '').length === 1
@@ -411,6 +436,7 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
       localHalfExtents,
       localCenterOffset,
       handleDistanceWorld,
+      boundsKnown,
     }
 
     this._axis = axis
@@ -561,7 +587,11 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
       localHalfExtents: drag.localHalfExtents,
       localCenterOffset: drag.localCenterOffset,
       handleDistanceWorld: drag.handleDistanceWorld,
-      centerAnchored: this._altKey || drag.axis === 'XYZ',
+      // Alt selects the anchor the gizmo is NOT configured for. Uniform scaling
+      // is always centered, and without measurable bounds there is no opposite
+      // face to pin — shifting by a guessed extent would just slide the object.
+      centerAnchored:
+        (this._scaleAnchor === 'center' ? !this._altKey : this._altKey) || drag.axis === 'XYZ' || !drag.boundsKnown,
       scaleSnap: this.scaleSnap,
     })
     object.scale.copy(scale)
@@ -606,8 +636,11 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
   /**
    * Bounding box of the object in its own local (unscaled) frame:
    * half extents + center offset, used to place the extrude anchor.
+   *
+   * @returns false when nothing measurable was found (e.g. a splat or an empty
+   * container), in which case the caller must fall back to center anchoring.
    */
-  private computeLocalBounds(object: Object3D, halfExtents: Vector3, centerOffset: Vector3): void {
+  private computeLocalBounds(object: Object3D, halfExtents: Vector3, centerOffset: Vector3): boolean {
     // descendants' matrixWorld may be stale (attach + grab before the first
     // render, or children moved programmatically) — refresh the subtree
     object.updateWorldMatrix(false, true)
@@ -626,7 +659,7 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
     if (_box.isEmpty()) {
       halfExtents.set(0.5, 0.5, 0.5)
       centerOffset.set(0, 0, 0)
-      return
+      return false
     }
     _box.getSize(halfExtents).multiplyScalar(0.5)
     _box.getCenter(centerOffset)
@@ -634,5 +667,6 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
     halfExtents.x = Math.max(halfExtents.x, 1e-6)
     halfExtents.y = Math.max(halfExtents.y, 1e-6)
     halfExtents.z = Math.max(halfExtents.z, 1e-6)
+    return true
   }
 }

@@ -93,7 +93,7 @@ gizmo.setScaleSnap(0.25)
 | Drag an axis end-cube (scale)          | extrude along that axis — the opposite face stays put                    |
 | Drag a plane quad (scale)              | extrude two axes — the opposite corner stays put                         |
 | Drag the center cube (scale)           | uniform scale from the center                                            |
-| <kbd>Alt</kbd> + scale drag            | scale from the center instead of anchoring                               |
+| <kbd>Alt</kbd> + scale drag            | use the anchor `scaleAnchor` is not set to (default: scale from center)  |
 | <kbd>Shift</kbd> + rotate drag         | snap to `theme.snapping.shiftRotationSnapDeg` (default 15°)              |
 
 Modifier keys are read from the pointer event, so they take effect on the next
@@ -110,6 +110,7 @@ modifier mid-drag never causes a jump.
 | `camera`        | `Camera`       | perspective or orthographic; may be parented to a rig |
 | `domElement`    | `HTMLElement`  | usually `renderer.domElement`                         |
 | `options.theme` | `PartialTheme` | deep-merged over the defaults                         |
+| `options.scaleAnchor` | `ScaleAnchor` | `'opposite'` (default, extrude) or `'center'`      |
 
 ### Methods
 
@@ -119,6 +120,7 @@ modifier mid-drag never causes a jump.
 | `detach()`                      | stop controlling; ends an active drag and hides the gizmo        |
 | `setMode(mode)`                 | `'translate' \| 'rotate' \| 'scale'` (also settable via `.mode`) |
 | `setSpace(space)`               | `'world' \| 'local'` (also settable via `.space`)                |
+| `setScaleAnchor(anchor)`        | `'opposite' \| 'center'` (also settable via `.scaleAnchor`)      |
 | `setTranslationSnap(n \| null)` | grid snap for translation, in world units                        |
 | `setRotationSnap(rad \| null)`  | permanent rotation snap, in radians                              |
 | `setScaleSnap(n \| null)`       | snap for the resulting scale value                               |
