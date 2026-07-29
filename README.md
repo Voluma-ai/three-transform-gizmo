@@ -207,7 +207,7 @@ rather than every frame.
 | ----------------------------------------------------- | ---------------------- | -------------------------------------------------- |
 | `gizmoSize`                                           | `1`                    | base multiplier (combined with `size`)             |
 | `arrowLength` / `arrowHeadLength` / `arrowHeadRadius` | `0.8` / `0.2` / `0.06` | translate arrows                                   |
-| `axisLineRadius`                                      | `0.0125`               | axis shaft thickness                               |
+| `axisLineRadius`                                      | `0.00625`              | axis shaft thickness                               |
 | `planeOffset` / `planeSize`                           | `0.45` / `0.22`        | plane handle placement and size                    |
 | `ringRadius` / `ringTube`                             | `0.75` / `0.0075`      | rotate rings                                       |
 | `screenRingRadius`                                    | `0.95`                 | outer screen-space ring                            |

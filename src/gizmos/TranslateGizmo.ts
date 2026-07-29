@@ -30,27 +30,33 @@ export class TranslateGizmo extends ModeGizmo {
       shaft.position.copy(dir).multiplyScalar((t.sizes.arrowLength - t.sizes.arrowHeadLength) / 2)
       this.visual.add(shaft)
 
-      const head = makeHandle(geo.arrowHead(t), colors[letter], 'translate', axis, t)
-      head.rotation.copy(rot)
-      head.position.copy(dir).multiplyScalar(t.sizes.arrowLength - t.sizes.arrowHeadLength / 2)
-      this.visual.add(head)
+      // arrow heads on both ends of the axis; the shaft is only drawn on the
+      // positive side, matching three.js TransformControls
+      for (const sign of [1, -1]) {
+        const head = makeHandle(geo.arrowHead(t), colors[letter], 'translate', axis, t)
+        head.rotation.copy(rot)
+        // flip the cone in its own frame so it points away from the origin
+        if (sign < 0) head.rotateZ(Math.PI)
+        head.position.copy(dir).multiplyScalar(sign * (t.sizes.arrowLength - t.sizes.arrowHeadLength / 2))
+        this.visual.add(head)
 
-      const picker = makeHandle(
-        new CylinderGeometry(
-          t.sizes.arrowHeadRadius * t.sizes.pickerScale,
-          t.sizes.arrowHeadRadius * t.sizes.pickerScale,
-          t.sizes.arrowLength,
-          6,
-        ),
-        0,
-        'translate',
-        axis,
-        t,
-        true,
-      )
-      picker.rotation.copy(rot)
-      picker.position.copy(dir).multiplyScalar(t.sizes.arrowLength / 2 + 0.1)
-      this.picker.add(picker)
+        const picker = makeHandle(
+          new CylinderGeometry(
+            t.sizes.arrowHeadRadius * t.sizes.pickerScale,
+            t.sizes.arrowHeadRadius * t.sizes.pickerScale,
+            t.sizes.arrowLength,
+            6,
+          ),
+          0,
+          'translate',
+          axis,
+          t,
+          true,
+        )
+        picker.rotation.copy(rot)
+        picker.position.copy(dir).multiplyScalar(sign * (t.sizes.arrowLength / 2 + 0.1))
+        this.picker.add(picker)
+      }
     }
 
     for (const { axis, rot, pos } of PLANES) {

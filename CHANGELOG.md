@@ -6,6 +6,13 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Translate arrows now appear on both ends of each axis, so an object can be
+  dragged from either side. Matching three.js `TransformControls`, only the
+  positive side draws a shaft — the negative side is the arrow head alone. Both
+  heads report the same axis, so dragging either behaves identically.
+
 ## [0.4.0] - 2026-07-29
 
 ### Changed
@@ -14,6 +21,10 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `0.0075` (was `0.015`). Pick radius is unchanged — the invisible picker torus
   multiplier was doubled to compensate. Override `sizes.ringTube` to restore the
   previous look.
+- Translate and scale axis shafts are half as thick by default to match:
+  `theme.sizes.axisLineRadius` is now `0.00625` (was `0.0125`). Pick radii for
+  those handles derive from `arrowHeadRadius` / `scaleCubeSize`, so grabbing is
+  unaffected. Override `sizes.axisLineRadius` to restore the previous look.
 
 ## [0.3.0] - 2026-07-29
 

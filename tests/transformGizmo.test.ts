@@ -111,6 +111,16 @@ describe('hover picking', () => {
     expect(events).toEqual(['on:X', 'off'])
   })
 
+  it('picks the same axis from the negative side of the arrow', () => {
+    move(handlePoint(X.clone().negate(), 0.6))
+    expect(gizmo.axis).toBe('X')
+  })
+
+  it('drags along the negative arrow the same way as the positive one', () => {
+    drag(handlePoint(X.clone().negate(), 0.6), 60, 0)
+    expect(cube.position.x).toBeGreaterThan(0)
+  })
+
   it('picks correctly before the first render after attach', () => {
     // fresh gizmo + object that was never rendered: matrices are stale
     const g = new TransformGizmo(camera, el as unknown as HTMLElement)
