@@ -745,6 +745,47 @@ describe('combined mode', () => {
     up(towardAxis)
   })
 
+  it('overrides sticky rotate when the scale cube core is under the pointer', () => {
+    gizmo.setMode('combined')
+    gizmo.updateMatrixWorld(true)
+    const r = gizmo.getTheme().sizes.ringRadius * gizmo.scale.x
+    const onRing = toScreen(
+      cube.getWorldPosition(new Vector3()).add(new Vector3(r * Math.cos(1.3), 0, r * Math.sin(1.3))),
+    )
+    move(onRing)
+
+    let op: string | null = null
+    gizmo.addEventListener('mouseDown', (e) => {
+      op = e.mode
+    })
+    const cubePt = pickerScreen('scale', '+X')
+    move(cubePt)
+    down(cubePt)
+    expect(op).toBe('scale')
+    up(cubePt)
+  })
+
+  it('overrides sticky rotate when the translate arrow core is under the pointer', () => {
+    gizmo.setMode('combined')
+    gizmo.updateMatrixWorld(true)
+    const r = gizmo.getTheme().sizes.ringRadius * gizmo.scale.x
+    const onRing = toScreen(
+      cube.getWorldPosition(new Vector3()).add(new Vector3(r * Math.cos(1.3), 0, r * Math.sin(1.3))),
+    )
+    move(onRing)
+
+    let op: string | null = null
+    gizmo.addEventListener('mouseDown', (e) => {
+      op = e.mode
+    })
+    // on the arrow silhouette (core radius = arrowHeadRadius)
+    const arrowPt = handlePoint(X, 0.45)
+    move(arrowPt)
+    down(arrowPt)
+    expect(op).toBe('translate')
+    up(arrowPt)
+  })
+
   it('prefers scale over rotate when both pickers hit', () => {
     gizmo.setMode('combined')
     let op: string | null = null

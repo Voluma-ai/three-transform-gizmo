@@ -93,6 +93,11 @@ export class ScaleGizmo extends ModeGizmo {
         picker.position.copy(cube.position)
         this.picker.add(picker)
 
+        const core = makeHandle(geo.sphere(t.sizes.scaleCubeSize / 2), 0, 'scale', axis, t, true)
+        core.position.copy(cube.position)
+        core.userData.handle.core = true
+        this.picker.add(core)
+
         // dashed half from center toward this cube
         const end = dir.clone().multiplyScalar(sign * halfSpan)
         const geoLine = new BufferGeometry()
@@ -149,6 +154,9 @@ export class ScaleGizmo extends ModeGizmo {
       true,
     )
     this.picker.add(centerPicker)
+    const centerCore = makeHandle(geo.sphere(centerShapeR), 0, 'scale', 'XYZ', t, true)
+    centerCore.userData.handle.core = true
+    this.picker.add(centerCore)
   }
 
   override updateVisuals(

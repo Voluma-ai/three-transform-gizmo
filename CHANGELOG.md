@@ -6,6 +6,11 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- Sticky rotate hover yields when the pointer is over a translate arrow or scale
+  cube _core_ (the drawn shape); the larger picker overhang still keeps rotate.
+
 ## [0.6.0] - 2026-08-03
 
 ### Added

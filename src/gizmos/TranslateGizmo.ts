@@ -40,6 +40,7 @@ export class TranslateGizmo extends ModeGizmo {
         head.position.copy(dir).multiplyScalar(sign * (t.sizes.arrowLength - t.sizes.arrowHeadLength / 2))
         this.visual.add(head)
 
+        const pickPos = dir.clone().multiplyScalar(sign * (t.sizes.arrowLength / 2 + 0.1))
         const pickR = halfOverhangRadius(t.sizes.arrowHeadRadius, t.sizes.arrowHeadRadius * t.sizes.pickerScale)
         const picker = makeHandle(
           new CylinderGeometry(pickR, pickR, t.sizes.arrowLength, 6),
@@ -50,8 +51,22 @@ export class TranslateGizmo extends ModeGizmo {
           true,
         )
         picker.rotation.copy(rot)
-        picker.position.copy(dir).multiplyScalar(sign * (t.sizes.arrowLength / 2 + 0.1))
+        picker.position.copy(pickPos)
         this.picker.add(picker)
+
+        const coreR = t.sizes.arrowHeadRadius
+        const core = makeHandle(
+          new CylinderGeometry(coreR, coreR, t.sizes.arrowLength, 6),
+          0,
+          'translate',
+          axis,
+          t,
+          true,
+        )
+        core.rotation.copy(rot)
+        core.position.copy(pickPos)
+        core.userData.handle.core = true
+        this.picker.add(core)
       }
     }
 
