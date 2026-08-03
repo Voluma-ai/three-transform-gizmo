@@ -11,7 +11,7 @@ A near drop-in replacement for `TransformControls` with **extrude-style scaling*
   center instead. A center cube scales uniformly.
 - **Per-plane scaling.** `+XY`, `-XZ`, … handles scale two axes at once, anchored on  
   the opposite corner.
-- **Rotation with angle feedback.** Three axis rings plus a screen-space ring,  
+- **Rotation with angle feedback.** Three axis rings plus a screen-space ring.
   Optional live degrees readout (e.g. `45°`). Hold Shift for snapping.
 - **Themeable.** Colors, opacities and geometry sizes come from a theme object.
 - **Combined mode.** Translate, rotate and scale in one view.
