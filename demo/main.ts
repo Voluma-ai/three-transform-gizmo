@@ -147,7 +147,7 @@ function applyTheme() {
             sector: 0x56ccf2,
             sectorLabel: 0x56ccf2,
           },
-          sizes: { scaleCubeSize: 0.13, ringTube: 0.0125, arrowHeadRadius: 0.08 },
+          sizes: { scaleCubeSize: 0.13, ringTube: 0.019, arrowHeadRadius: 0.08 },
           showSectorLabel: degreesBox.checked,
         }
       : {
@@ -160,7 +160,7 @@ function applyTheme() {
             sector: 0xffd60a,
             sectorLabel: 0xffd60a,
           },
-          sizes: { scaleCubeSize: 0.1, ringTube: 0.0075, arrowHeadRadius: 0.06 },
+          sizes: { scaleCubeSize: 0.1, ringTube: 0.012, arrowHeadRadius: 0.06 },
           showSectorLabel: degreesBox.checked,
         },
   )

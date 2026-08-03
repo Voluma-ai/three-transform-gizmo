@@ -203,17 +203,17 @@ rather than every frame.
 | `inactiveWhileDragging`     | `0.15`  | other handles fade out during a drag |
 | `sector`                    | `0.25`  | angle sector fill                    |
 
-| `sizes`                                               | Default                |                                                    |
-| ----------------------------------------------------- | ---------------------- | -------------------------------------------------- |
-| `gizmoSize`                                           | `1`                    | base multiplier (combined with `size`)             |
-| `arrowLength` / `arrowHeadLength` / `arrowHeadRadius` | `0.8` / `0.2` / `0.06` | translate arrows                                   |
-| `axisLineRadius`                                      | `0.00625`              | axis shaft thickness                               |
-| `planeOffset` / `planeSize`                           | `0.45` / `0.22`        | plane handle placement and size                    |
-| `ringRadius` / `ringTube`                             | `0.75` / `0.0075`      | rotate rings                                       |
-| `screenRingRadius`                                    | `0.95`                 | outer screen-space ring                            |
-| `scaleCubeSize` / `scaleHandleDistance`               | `0.1` / `0.8`          | scale handles                                      |
-| `pickerScale`                                         | `2.5`                  | invisible hit-area multiplier                      |
-| `sectorLabelSize`                                     | `0.16`                 | relative degrees-readout text height (gizmo units) |
+| `sizes`                                               | Default                 |                                                    |
+| ----------------------------------------------------- | ----------------------- | -------------------------------------------------- |
+| `gizmoSize`                                           | `1`                     | base multiplier (combined with `size`)             |
+| `arrowLength` / `arrowHeadLength` / `arrowHeadRadius` | `0.55` / `0.2` / `0.06` | translate arrows                                   |
+| `axisLineRadius`                                      | `0.00625`               | axis shaft thickness                               |
+| `planeOffset` / `planeSize`                           | `0.45` / `0.22`         | plane handle placement and size                    |
+| `ringRadius` / `ringTube`                             | `0.75` / `0.012`        | rotate rings                                       |
+| `screenRingRadius`                                    | `0.95`                  | outer screen-space ring                            |
+| `scaleCubeSize` / `scaleHandleDistance`               | `0.1` / `1.0`           | scale handles                                      |
+| `pickerScale`                                         | `2.5`                   | invisible hit-area multiplier                      |
+| `sectorLabelSize`                                     | `0.16`                  | relative degrees-readout text height (gizmo units) |
 
 | Other                           | Default |                                                             |
 | ------------------------------- | ------- | ----------------------------------------------------------- |

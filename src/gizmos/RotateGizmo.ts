@@ -39,6 +39,13 @@ export class RotateGizmo extends ModeGizmo {
   }
 
   override getPickers() {
-    return [...super.getPickers(), this.screenGroup.children[1] as ReturnType<ModeGizmo['getPickers']>[number]]
+    const axisPickers = super.getPickers()
+    if (this.layout === 'combined') return axisPickers
+    return [...axisPickers, this.screenGroup.children[1] as ReturnType<ModeGizmo['getPickers']>[number]]
+  }
+
+  /** outer screen-space ring is dropped in the multi-tool view */
+  protected override hiddenInCombined(axis: AxisId): boolean {
+    return axis === 'E'
   }
 }

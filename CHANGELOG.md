@@ -6,6 +6,24 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- Translate arrows are shorter by default (`arrowLength` `0.55`, was `0.8`) and
+  scale handles sit farther out (`scaleHandleDistance` `1.0`, was `0.8`) so the
+  combined radial layout reads arrow → gap → rotate ring → gap → scale cube.
+  Rotate rings are thicker (`ringTube` `0.012`, was `0.0075`).
+- Combined mode drops translate/scale plane quads, idle scale shafts, and the
+  outer screen-space rotate ring. While translate or scale is hovered or
+  dragged, the other tools' visuals hide (rotate keeps the full multi-tool
+  view). Overlapping picks resolve as translate → scale → rotate, except
+  while a rotate ring is already the active hover: then rotate stays sticky
+  as long as the ray still hits a rotate picker.
+- While a scale cube is hovered or dragged, dashed axis guides appear:
+  half-axis to the cube by default, full current axis with Alt, all axes with
+  Shift. Same guides in dedicated scale mode (solid shafts hide while guiding).
+- Translate / scale axis pick radii only overhang the visual by half as much
+  as before (arrow head radius and cube half-extent as the shape baseline).
+
 ## [0.5.0] - 2026-07-29
 
 ### Added

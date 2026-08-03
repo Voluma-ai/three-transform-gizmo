@@ -60,6 +60,13 @@ interface PickedHandle {
   axis: AxisId
 }
 
+/** lower = preferred when several mode pickers intersect the same ray */
+const PICK_PRIORITY: Record<GizmoOperation, number> = {
+  translate: 0,
+  scale: 1,
+  rotate: 2,
+}
+
 const _pointer = new Vector2()
 const _v1 = new Vector3()
 const _v2 = new Vector3()
@@ -128,6 +135,7 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
   private _onPointerDown = (e: PointerEvent) => this.pointerDown(e)
   private _onPointerMove = (e: PointerEvent) => this.pointerMove(e)
   private _onPointerUp = (e: PointerEvent) => this.pointerUp(e)
+  private _onKeyChange = (e: KeyboardEvent) => this.keyChange(e)
 
   constructor(camera: Camera, domElement: HTMLElement, options: TransformGizmoOptions = {}) {
     super()
@@ -148,6 +156,8 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
     domElement.addEventListener('pointermove', this._onPointerMove)
     domElement.addEventListener('pointerup', this._onPointerUp)
     domElement.addEventListener('pointercancel', this._onPointerUp)
+    domElement.ownerDocument?.addEventListener('keydown', this._onKeyChange)
+    domElement.ownerDocument?.addEventListener('keyup', this._onKeyChange)
   }
 
   // ---------------------------------------------------------------- public API
@@ -172,6 +182,7 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
     this._mode = mode
     this._axis = null
     this._operation = null
+    this.applyModeLayout()
     this.dispatchEvent({ type: 'change' })
   }
 
@@ -283,6 +294,7 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
     this._sector = new AngleSector(this._theme)
     this._sector.setRadius(this._theme.sizes.ringRadius)
     this.add(this._translate, this._rotate, this._scale, this._sector)
+    this.applyModeLayout()
     this.dispatchEvent({ type: 'change' })
   }
 
@@ -292,6 +304,8 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
     this.domElement.removeEventListener('pointermove', this._onPointerMove)
     this.domElement.removeEventListener('pointerup', this._onPointerUp)
     this.domElement.removeEventListener('pointercancel', this._onPointerUp)
+    this.domElement.ownerDocument?.removeEventListener('keydown', this._onKeyChange)
+    this.domElement.ownerDocument?.removeEventListener('keyup', this._onKeyChange)
     this._translate.dispose()
     this._rotate.dispose()
     this._scale.dispose()
@@ -327,17 +341,26 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
       const camQ = this.camera.getWorldQuaternion(_q2)
       this._rotate.screenGroup.quaternion.copy(this.quaternion).invert().multiply(camQ)
 
-      this._translate.visible = this._mode === 'translate' || this._mode === 'combined'
-      this._rotate.visible = this._mode === 'rotate' || this._mode === 'combined'
-      this._scale.visible = this._mode === 'scale' || this._mode === 'combined'
-
       const show = { x: this.showX, y: this.showY, z: this.showZ }
       const dragAxis = this._dragging ? this._axis : null
       const hoverAxis = this._dragging ? null : this._axis
       const activeOp = this._dragging ? (this._drag?.mode ?? null) : this._operation
+
+      this._translate.visible = this._mode === 'translate' || this._mode === 'combined'
+      this._rotate.visible = this._mode === 'rotate' || this._mode === 'combined'
+      this._scale.visible = this._mode === 'scale' || this._mode === 'combined'
+      // combined: hide other tools' visuals while translate/scale is active
+      // (rotate keeps the full multi-tool view so rings stay contextual)
+      const focus = this._mode === 'combined' ? activeOp : null
+      const solo = focus === 'translate' || focus === 'scale'
+      this._translate.visual.visible = !solo || focus === 'translate'
+      this._rotate.visual.visible = !solo || focus === 'rotate'
+      this._scale.visual.visible = !solo || focus === 'scale'
+
+      const mods = { alt: this._altKey, shift: this._shiftKey }
       for (const g of this.visibleModeGizmos()) {
         const match = activeOp === g.mode
-        g.updateVisuals(match ? hoverAxis : null, match ? dragAxis : null, this._theme, show)
+        g.updateVisuals(match ? hoverAxis : null, match ? dragAxis : null, this._theme, show, mods)
       }
     }
     super.updateMatrixWorld(force)
@@ -351,6 +374,13 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
     if (this._rotate.visible) out.push(this._rotate)
     if (this._scale.visible) out.push(this._scale)
     return out
+  }
+
+  private applyModeLayout(): void {
+    const layout = this._mode === 'combined' ? 'combined' : 'full'
+    this._translate.layout = layout
+    this._rotate.layout = layout
+    this._scale.layout = layout
   }
 
   private setRayFromEvent(event: PointerEvent): void {
@@ -372,9 +402,36 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
       g.getPickers().filter((p) => ModeGizmo.axisShown(p.userData.handle.axis, show)),
     )
     const hits = this._raycaster.intersectObjects(pickers, false)
-    const hit = hits[0]
-    if (!hit) return null
-    const { mode, axis } = (hit.object as HandleMesh).userData.handle
+    if (hits.length === 0) return null
+
+    const handleOf = (h: (typeof hits)[number]) => (h.object as HandleMesh).userData.handle
+
+    // once a rotate ring is the active hover, keep it while the ray still
+    // hits any rotate picker — avoids flicker onto overlapping translate/scale
+    if (!this._dragging && this._operation === 'rotate') {
+      let bestRotate: (typeof hits)[number] | null = null
+      for (const h of hits) {
+        if (handleOf(h).mode !== 'rotate') continue
+        if (!bestRotate || h.distance < bestRotate.distance) bestRotate = h
+      }
+      if (bestRotate) {
+        const { mode, axis } = handleOf(bestRotate)
+        return { mode, axis }
+      }
+    }
+
+    // default: translate beats scale beats rotate
+    let best = hits[0]!
+    let bestPri = PICK_PRIORITY[handleOf(best).mode]
+    for (let i = 1; i < hits.length; i++) {
+      const h = hits[i]!
+      const pri = PICK_PRIORITY[handleOf(h).mode]
+      if (pri < bestPri || (pri === bestPri && h.distance < best.distance)) {
+        best = h
+        bestPri = pri
+      }
+    }
+    const { mode, axis } = handleOf(best)
     return { mode, axis }
   }
 
@@ -484,6 +541,8 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
 
   private pointerMove(event: PointerEvent): void {
     if (!this._enabled || !this.object) return
+    this._altKey = event.altKey
+    this._shiftKey = event.shiftKey
     if (!this._dragging) {
       if (!event.isPrimary) return
       this.updateHover(this.pickHandle(event))
@@ -491,8 +550,6 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
     }
     const drag = this._drag
     if (!drag || event.pointerId !== drag.pointerId) return
-    this._altKey = event.altKey
-    this._shiftKey = event.shiftKey
 
     this.setRayFromEvent(event)
     if (!intersectPlane(this._raycaster.ray, drag.plane, _v1)) return
@@ -503,6 +560,17 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
     else this.applyScale(drag, point)
 
     this.dispatchEvent({ type: 'objectChange' })
+    this.dispatchEvent({ type: 'change' })
+  }
+
+  private keyChange(event: KeyboardEvent): void {
+    if (!this._enabled || !this.object) return
+    const alt = event.altKey
+    const shift = event.shiftKey
+    if (alt === this._altKey && shift === this._shiftKey) return
+    this._altKey = alt
+    this._shiftKey = shift
+    // refresh dashed scale guides while hovering / dragging without moving
     this.dispatchEvent({ type: 'change' })
   }
 
