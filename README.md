@@ -79,6 +79,7 @@ gizmo.setScaleSnap(0.25)
 | Drag a plane quad (translate)          | move in that plane                                                       |
 | Drag the center octahedron (translate) | move in the screen plane                                                 |
 | Drag a ring (rotate)                   | rotate about that axis; the outer white ring rotates about the view axis |
+| Drag the center sphere (rotate)        | trackball free-rotate (`XYZE`; hidden in combined mode)                  |
 | Drag an axis end-cube (scale)          | extrude along that axis — the opposite face stays put                    |
 | Drag a plane quad (scale)              | scale two axes from the center (origin stays fixed)                      |
 | Drag the center cube (scale)           | uniform scale from the center                                            |
@@ -223,8 +224,9 @@ stay signed for extrude.
 - **World-space translation snapping with a rotated or scaled parent** snaps in
   the parent's frame offset by its world translation, matching upstream
   `TransformControls`. It is exact for unrotated parents.
-- **The extrude anchor needs bounds.** It uses the object's local bounding box;
-  objects with no renderable geometry fall back to a unit box.
+- **The extrude anchor needs bounds.** It uses the object's local bounding box.
+  Objects with no renderable geometry (splats, empty containers) scale about
+  their origin instead — no guessed unit-box shift.
 - **Add the gizmo to the scene root.** It writes its own world position and
   orientation each frame, so parenting it to a transformed group will misalign it.
 - **Call** `dispose()` when you are done — it owns DOM listeners on `domElement`.

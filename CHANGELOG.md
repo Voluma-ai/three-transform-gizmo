@@ -6,17 +6,10 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-08-03
+
 ### Added
 
-- Origin trail while translating or scaling: gray disc at drag-start plus a
-  dashed line to the current origin (axis-colored; dual-dash on planes).
-- Optional theme labels (all off by default): `showScaleLabel` (`150%`),
-  `showScaleModifiers` (Shift/Alt hints), `showOriginDistanceLabel` (trail
-  distance while translating).
-- Translate modifiers: Alt snaps the drag offset by `snapping.altTranslationSnap`
-  (default `1`); Shift snaps dragged axes to integer world coordinates.
-- `sizes.scaleHandleDistanceNonUniform` (default `0.4225`) for shorter non-uniform
-  scale axes; dedicated translate arrows match that radius.
 - TransformControls API parity: `getMode()`, `getHelper()`, `setColors()`,
   `connect()` / `disconnect()`, `showXY`/`showXZ`/`showYZ`/`showE`/`showXYZE`,
   `minX`…`maxZ` translation clamps, `viewport` pointer mapping, and
@@ -26,31 +19,57 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
-- Geometry defaults are ~30% larger than the post-`gizmoSize` removal baseline
-  so `setSize(1)` reads bigger while the API default stays `1`.
+- Overall size is `setSize()` / `.size` only (default `1`). Theme geometry
+  defaults are ~0.65× the previous values so the radial layout still fits after
+  dropping the separate `gizmoSize` multiplier (e.g. `arrowLength` `0.55` →
+  `0.3575`, `scaleHandleDistance` `1.0` → `0.65`).
+- `sizes.scaleHandleDistanceNonUniform` default `0.65` → `0.4225`; dedicated
+  translate arrows match that radius.
 - Rotation degrees use the same size as the scale % (`labelSize × 1.15`).
 - Renamed `sizes.modifierLabelSize` → `sizes.labelSize`; removed
   `sizes.sectorLabelSize`.
 - Renamed `sizes.scaleCubeSize` → `sizes.gripSize` (scale cubes + translate
   center octa).
-- Plane scale handles always keep the origin fixed (center-anchored).
 - Scale shows one plane quad per plane (`+XY`/`+XZ`/`+YZ`), matching
   `TransformControls` (no opposite-diagonal quads).
+
+### Removed
+
+- `sizes.gizmoSize` — use `setSize()` / `.size` instead (same as
+  `TransformControls`).
+
+## [0.7.0] - 2026-08-03
+
+### Added
+
+- Origin trail while translating or scaling: gray disc at drag-start plus a
+  dashed line to the current origin (axis-colored; dual-dash on planes).
+- Optional theme labels (all off by default): `showScaleLabel` (`150%`),
+  `showScaleModifiers` (Shift/Alt hints), `showOriginDistanceLabel` (trail
+  distance while translating).
+- Translate modifiers: Alt snaps the drag offset by `snapping.altTranslationSnap`
+  (default `1`); Shift snaps dragged axes to integer world coordinates.
+- `sizes.scaleHandleDistanceNonUniform` (default `0.65`) for shorter non-uniform
+  scale axes; dedicated translate arrows match that radius.
+
+### Changed
+
+- Plane scale handles always keep the origin fixed (center-anchored).
 - Shift + scale also forces center-anchored (in addition to proportional).
 - Translate / scale plane colors match `TransformControls` (perp-axis tint);
   plane quads are smaller and closer (`planeSize` / `planeOffset`).
-- Sticky rotate hover yields when the pointer is over a translate arrow or scale
-  cube _core_ (the drawn shape); the larger picker overhang still keeps rotate.
 - While scale-dragging, yellow (highlighted) axis cubes/guides stretch with the
   object's scale intensity (`1 + 0.8*(r-1)`).
 - Near-zero scale starts use a sensitivity floor (0.1) so a later drag can grow
   the object again without needing absurd multiplicative ratios (extrude still
   pins the opposite face).
 
-### Removed
+## [0.6.1] - 2026-08-03
 
-- `sizes.gizmoSize` — use `setSize()` / `.size` instead (same as
-  `TransformControls`).
+### Changed
+
+- Sticky rotate hover yields when the pointer is over a translate arrow or scale
+  cube _core_ (the drawn shape); the larger picker overhang still keeps rotate.
 
 ## [0.6.0] - 2026-08-03
 
@@ -107,7 +126,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   previous look.
 - Translate and scale axis shafts are half as thick by default to match:
   `theme.sizes.axisLineRadius` is now `0.00625` (was `0.0125`). Pick radii for
-  those handles derive from `arrowHeadRadius` / `gripSize`, so grabbing is
+  those handles derive from `arrowHeadRadius` / `scaleCubeSize`, so grabbing is
   unaffected. Override `sizes.axisLineRadius` to restore the previous look.
 
 ## [0.3.0] - 2026-07-29
@@ -170,7 +189,10 @@ Initial release, published to npm as `@voluma/three-transform-gizmo`.
   `latest`.
 - Ships ESM and CJS builds with TypeScript declarations for both.
 
-[Unreleased]: https://github.com/Voluma-ai/three-transform-gizmo/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/Voluma-ai/three-transform-gizmo/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/Voluma-ai/three-transform-gizmo/compare/v0.7.0...v0.8.0
+[0.7.0]: https://github.com/Voluma-ai/three-transform-gizmo/compare/v0.6.1...v0.7.0
+[0.6.1]: https://github.com/Voluma-ai/three-transform-gizmo/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/Voluma-ai/three-transform-gizmo/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/Voluma-ai/three-transform-gizmo/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/Voluma-ai/three-transform-gizmo/compare/v0.3.0...v0.4.0
