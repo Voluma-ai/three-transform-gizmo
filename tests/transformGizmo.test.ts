@@ -1,5 +1,16 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { BoxGeometry, Group, Mesh, MeshBasicMaterial, PerspectiveCamera, Scene, Vector3 } from 'three'
+import {
+  BoxGeometry,
+  Group,
+  Line,
+  LineDashedMaterial,
+  Mesh,
+  MeshBasicMaterial,
+  PerspectiveCamera,
+  Scene,
+  Vector3,
+} from 'three'
+import { ModeGizmo } from '../src/gizmos/ModeGizmo'
 import { TransformGizmo } from '../src/TransformGizmo'
 import type { AxisId } from '../src/types'
 import { createFakeElement, HEIGHT, pointerEvent, WIDTH, type FakeElement } from './helpers/fakeDom'
@@ -176,9 +187,13 @@ describe('translate', () => {
 })
 
 describe('rotate', () => {
+  function ringPoint(): { x: number; y: number } {
+    return handlePoint(Y, gizmo.getTheme().sizes.ringRadius)
+  }
+
   it('rotates the object and snaps with Shift', () => {
     gizmo.setMode('rotate')
-    drag(handlePoint(Y, 0.75), 60, 25, { shiftKey: true })
+    drag(ringPoint(), 60, 25, { shiftKey: true })
     const angle = 2 * Math.acos(Math.min(1, Math.abs(cube.quaternion.w)))
     const deg = (angle * 180) / Math.PI
     expect(deg).toBeGreaterThan(0)
@@ -187,7 +202,7 @@ describe('rotate', () => {
 
   it('hides the angle sector when the drag ends', () => {
     gizmo.setMode('rotate')
-    const pt = handlePoint(Y, 0.75)
+    const pt = ringPoint()
     down(pt)
     move({ x: pt.x + 40, y: pt.y + 15 })
     const sector = gizmo.children.find((c) => c.type === 'Mesh')
@@ -198,7 +213,7 @@ describe('rotate', () => {
 
   it('keeps the degrees label hidden unless showSectorLabel is enabled', () => {
     gizmo.setMode('rotate')
-    const pt = handlePoint(Y, 0.75)
+    const pt = ringPoint()
     down(pt)
     move({ x: pt.x + 40, y: pt.y + 15 })
     const sector = gizmo.children.find((c) => c.type === 'Mesh')!
@@ -219,10 +234,14 @@ describe('rotate', () => {
 })
 
 describe('scale (extrude)', () => {
+  function scaleDist(): number {
+    return gizmo.getTheme().sizes.scaleHandleDistance
+  }
+
   it('anchors the opposite face when dragging a +X handle', () => {
     gizmo.setMode('scale')
     const anchorBefore = new Vector3(-0.5, 0, 0).applyMatrix4(cube.matrixWorld)
-    drag(handlePoint(X, 0.8), 60, 0)
+    drag(handlePoint(X, scaleDist()), 60, 0)
     cube.updateWorldMatrix(true, false)
     const anchorAfter = new Vector3(-0.5, 0, 0).applyMatrix4(cube.matrixWorld)
     expect(cube.scale.x).toBeGreaterThan(1.05)
@@ -231,7 +250,7 @@ describe('scale (extrude)', () => {
 
   it('scales from the center when Alt is held', () => {
     gizmo.setMode('scale')
-    drag(handlePoint(X, 0.8), 60, 0, { altKey: true })
+    drag(handlePoint(X, scaleDist()), 60, 0, { altKey: true })
     expect(cube.scale.x).toBeGreaterThan(1.05)
     expect(cube.position.length()).toBeCloseTo(0)
   })
@@ -246,7 +265,9 @@ describe('scale (extrude)', () => {
     gizmo.attach(group)
     gizmo.setMode('scale')
     gizmo.updateMatrixWorld(true)
-    const pt = toScreen(group.getWorldPosition(new Vector3()).add(X.clone().multiplyScalar(gizmo.scale.x * 0.8)))
+    const pt = toScreen(
+      group.getWorldPosition(new Vector3()).add(X.clone().multiplyScalar(gizmo.scale.x * scaleDist())),
+    )
     // bbox min in group-local space is x = 1.5 (child at +2, half extent 0.5)
     const anchorLocal = new Vector3(1.5, 0, 0)
     const anchorBefore = anchorLocal.clone().applyMatrix4(group.matrixWorld)
@@ -260,7 +281,7 @@ describe('scale (extrude)', () => {
   it('leaves the position untouched when the anchor is the center', () => {
     gizmo.setScaleAnchor('center')
     gizmo.setMode('scale')
-    drag(handlePoint(X, 0.8), 60, 0)
+    drag(handlePoint(X, scaleDist()), 60, 0)
     expect(cube.scale.x).toBeGreaterThan(1.05)
     expect(cube.position.length()).toBeCloseTo(0)
   })
@@ -269,7 +290,7 @@ describe('scale (extrude)', () => {
     gizmo.setScaleAnchor('center')
     gizmo.setMode('scale')
     const anchorBefore = new Vector3(-0.5, 0, 0).applyMatrix4(cube.matrixWorld)
-    drag(handlePoint(X, 0.8), 60, 0, { altKey: true })
+    drag(handlePoint(X, scaleDist()), 60, 0, { altKey: true })
     cube.updateWorldMatrix(true, false)
     const anchorAfter = new Vector3(-0.5, 0, 0).applyMatrix4(cube.matrixWorld)
     expect(cube.scale.x).toBeGreaterThan(1.05)
@@ -289,7 +310,9 @@ describe('scale (extrude)', () => {
     gizmo.attach(empty)
     gizmo.setMode('scale')
     gizmo.updateMatrixWorld(true)
-    const pt = toScreen(empty.getWorldPosition(new Vector3()).add(X.clone().multiplyScalar(gizmo.scale.x * 0.8)))
+    const pt = toScreen(
+      empty.getWorldPosition(new Vector3()).add(X.clone().multiplyScalar(gizmo.scale.x * scaleDist())),
+    )
     drag(pt, 60, 0)
     expect(empty.scale.x).toBeGreaterThan(1.05)
     expect(empty.position.length()).toBeCloseTo(0)
@@ -297,7 +320,7 @@ describe('scale (extrude)', () => {
 
   it('scales every axis by one ratio when Shift is held', () => {
     gizmo.setMode('scale')
-    drag(handlePoint(X, 0.8), 60, 0, { shiftKey: true })
+    drag(handlePoint(X, scaleDist()), 60, 0, { shiftKey: true })
     expect(cube.scale.x).toBeGreaterThan(1.05)
     expect(cube.scale.y).toBeCloseTo(cube.scale.x)
     expect(cube.scale.z).toBeCloseTo(cube.scale.x)
@@ -306,7 +329,7 @@ describe('scale (extrude)', () => {
   it('still anchors the opposite face when Shift is held', () => {
     gizmo.setMode('scale')
     const anchorBefore = new Vector3(-0.5, 0, 0).applyMatrix4(cube.matrixWorld)
-    drag(handlePoint(X, 0.8), 60, 0, { shiftKey: true })
+    drag(handlePoint(X, scaleDist()), 60, 0, { shiftKey: true })
     cube.updateWorldMatrix(true, false)
     const anchorAfter = new Vector3(-0.5, 0, 0).applyMatrix4(cube.matrixWorld)
     expect(anchorAfter.distanceTo(anchorBefore)).toBeLessThan(1e-6)
@@ -314,7 +337,7 @@ describe('scale (extrude)', () => {
 
   it('combines Shift and Alt: proportional growth about the origin', () => {
     gizmo.setMode('scale')
-    drag(handlePoint(X, 0.8), 60, 0, { shiftKey: true, altKey: true })
+    drag(handlePoint(X, scaleDist()), 60, 0, { shiftKey: true, altKey: true })
     expect(cube.scale.x).toBeGreaterThan(1.05)
     expect(cube.scale.z).toBeCloseTo(cube.scale.x)
     expect(cube.position.length()).toBeCloseTo(0)
@@ -324,7 +347,7 @@ describe('scale (extrude)', () => {
     cube.scale.set(-1, 1, 1)
     scene.updateMatrixWorld(true)
     gizmo.setMode('scale')
-    drag(handlePoint(X, 0.8), 60, 0)
+    drag(handlePoint(X, scaleDist()), 60, 0)
     expect(cube.scale.x).toBeLessThan(0)
     expect(Math.abs(cube.scale.x)).toBeGreaterThan(0.5) // did not collapse
   })
@@ -377,7 +400,7 @@ describe('drag lifecycle safety', () => {
     gizmo.setMode('scale')
     const pos = cube.position.clone()
     const scl = cube.scale.clone()
-    const pt = handlePoint(X, 0.8)
+    const pt = handlePoint(X, gizmo.getTheme().sizes.scaleHandleDistance)
     down(pt)
     move({ x: pt.x + 50, y: pt.y })
     expect(cube.scale.x).not.toBeCloseTo(scl.x)
@@ -475,5 +498,260 @@ describe('screen-constant sizing', () => {
     scene.updateMatrixWorld(true)
     gizmo.updateMatrixWorld(true)
     expect(gizmo.scale.x).toBeCloseTo(rigged, 6)
+  })
+})
+
+describe('combined mode', () => {
+  function modeChildren(): ModeGizmo[] {
+    return gizmo.children.filter((c): c is ModeGizmo => c instanceof ModeGizmo)
+  }
+
+  /** screen point of a specific mode's picker for the given axis */
+  function pickerScreen(mode: string, axis: AxisId): { x: number; y: number } {
+    gizmo.updateMatrixWorld(true)
+    const group = modeChildren().find((c) => c.mode === mode)!
+    const picker = group.getPickers().find((p) => p.userData.handle.axis === axis)
+    expect(picker).toBeTruthy()
+    return toScreen(picker!.getWorldPosition(new Vector3()))
+  }
+
+  it('shows translate, rotate, and scale gizmos together', () => {
+    gizmo.setMode('combined')
+    gizmo.updateMatrixWorld(true)
+    const modes = modeChildren()
+      .map((c) => c.mode)
+      .sort()
+    expect(modes).toEqual(['rotate', 'scale', 'translate'])
+    expect(modeChildren().every((c) => c.visible)).toBe(true)
+  })
+
+  it('hides the other gizmos again when leaving combined', () => {
+    gizmo.setMode('combined')
+    gizmo.updateMatrixWorld(true)
+    gizmo.setMode('translate')
+    gizmo.updateMatrixWorld(true)
+    for (const c of modeChildren()) {
+      expect(c.visible).toBe(c.mode === 'translate')
+    }
+  })
+
+  it('translates when a translate handle is dragged', () => {
+    gizmo.setMode('combined')
+    let op: string | null = null
+    gizmo.addEventListener('mouseDown', (e) => {
+      op = e.mode
+    })
+    // mid-shaft: away from the scale end-cube
+    drag(handlePoint(X, 0.35), 60, 0)
+    expect(op).toBe('translate')
+    expect(cube.position.x).toBeGreaterThan(0.1)
+    expect(cube.scale.x).toBeCloseTo(1)
+  })
+
+  it('scales when a scale handle is dragged', () => {
+    gizmo.setMode('combined')
+    let op: string | null = null
+    gizmo.addEventListener('mouseDown', (e) => {
+      op = e.mode
+    })
+    drag(pickerScreen('scale', '+X'), 60, 0)
+    expect(op).toBe('scale')
+    expect(cube.scale.x).toBeGreaterThan(1.05)
+  })
+
+  it('rotates when a rotate handle is dragged', () => {
+    gizmo.setMode('combined')
+    gizmo.updateMatrixWorld(true)
+    let op: string | null = null
+    gizmo.addEventListener('mouseDown', (e) => {
+      op = e.mode
+    })
+    // point on the Y ring (XZ plane), off the cardinal axis handles
+    const r = gizmo.getTheme().sizes.ringRadius * gizmo.scale.x
+    const pt = toScreen(cube.getWorldPosition(new Vector3()).add(new Vector3(r * Math.cos(0.6), 0, r * Math.sin(0.6))))
+    drag(pt, 40, 30)
+    expect(op).toBe('rotate')
+    const angle = 2 * Math.acos(Math.min(1, Math.abs(cube.quaternion.w)))
+    expect(angle).toBeGreaterThan(0)
+  })
+
+  it('reports the handle operation on mouseDown/mouseUp, not combined', () => {
+    gizmo.setMode('combined')
+    const modes: string[] = []
+    gizmo.addEventListener('mouseDown', (e) => modes.push(`down:${e.mode}`))
+    gizmo.addEventListener('mouseUp', (e) => modes.push(`up:${e.mode}`))
+    drag(handlePoint(X, 0.35), 40, 0)
+    expect(modes).toEqual(['down:translate', 'up:translate'])
+  })
+
+  it('hides the other tools while a handle is active', () => {
+    gizmo.setMode('combined')
+    gizmo.updateMatrixWorld(true)
+    const translate = modeChildren().find((c) => c.mode === 'translate')!
+    const rotate = modeChildren().find((c) => c.mode === 'rotate')!
+    const scale = modeChildren().find((c) => c.mode === 'scale')!
+
+    move(pickerScreen('scale', '+X'))
+    gizmo.updateMatrixWorld(true)
+    expect(translate.visual.visible).toBe(false)
+    expect(rotate.visual.visible).toBe(false)
+    expect(scale.visual.visible).toBe(true)
+
+    move(handlePoint(X, 0.35))
+    gizmo.updateMatrixWorld(true)
+    expect(translate.visual.visible).toBe(true)
+    expect(rotate.visual.visible).toBe(false)
+    expect(scale.visual.visible).toBe(false)
+
+    move({ x: 10, y: 10 })
+    gizmo.updateMatrixWorld(true)
+    expect(translate.visual.visible).toBe(true)
+    expect(rotate.visual.visible).toBe(true)
+    expect(scale.visual.visible).toBe(true)
+
+    // rotate keeps the other tools visible
+    const r = gizmo.getTheme().sizes.ringRadius * gizmo.scale.x
+    move(toScreen(cube.getWorldPosition(new Vector3()).add(new Vector3(r * Math.cos(1.3), 0, r * Math.sin(1.3)))))
+    gizmo.updateMatrixWorld(true)
+    expect(translate.visual.visible).toBe(true)
+    expect(rotate.visual.visible).toBe(true)
+    expect(scale.visual.visible).toBe(true)
+  })
+
+  it('hides plane quads, scale shafts, and the outer screen rotate ring', () => {
+    gizmo.setMode('combined')
+    gizmo.updateMatrixWorld(true)
+    const translate = modeChildren().find((c) => c.mode === 'translate')!
+    const scale = modeChildren().find((c) => c.mode === 'scale')!
+    const rotate = modeChildren().find((c) => c.mode === 'rotate')!
+    expect(translate.getPickers().some((p) => p.userData.handle.axis === 'XY')).toBe(false)
+    expect(scale.getPickers().some((p) => p.userData.handle.axis === '+XY')).toBe(false)
+    expect(rotate.getPickers().some((p) => p.userData.handle.axis === 'E')).toBe(false)
+
+    const show = { x: true, y: true, z: true }
+    const tPlane = translate.getVisualHandles().find((h) => h.userData.handle.axis === 'XY')!
+    const sPlane = scale.getVisualHandles().find((h) => h.userData.handle.axis === '+XY')!
+    const eVisual = rotate.getVisualHandles().find((h) => h.userData.handle.axis === 'E')!
+    translate.updateVisuals(null, null, gizmo.getTheme(), show)
+    scale.updateVisuals(null, null, gizmo.getTheme(), show)
+    rotate.updateVisuals(null, null, gizmo.getTheme(), show)
+    expect(tPlane.visible).toBe(false)
+    expect(sPlane.visible).toBe(false)
+    expect(eVisual.visible).toBe(false)
+
+    const scaleShafts = scale
+      .getVisualHandles()
+      .filter((h) => h.userData.handle.axis === '+X' && h.geometry.type === 'CylinderGeometry')
+    expect(scaleShafts.length).toBeGreaterThan(0)
+    expect(scaleShafts.every((h) => !h.visible)).toBe(true)
+    const scaleCube = scale
+      .getVisualHandles()
+      .find((h) => h.userData.handle.axis === '+X' && h.geometry.type === 'BoxGeometry')!
+    expect(scaleCube.visible).toBe(true)
+  })
+
+  it('shows a dashed scale axis guide while a scale cube is active', () => {
+    gizmo.setMode('combined')
+    gizmo.updateMatrixWorld(true)
+    const scale = modeChildren().find((c) => c.mode === 'scale')!
+    const show = { x: true, y: true, z: true }
+    const theme = gizmo.getTheme()
+    const lines = scale.visual.children.filter((o): o is Line => o.type === 'Line')
+    expect(lines.length).toBe(6)
+
+    scale.updateVisuals(null, null, theme, show)
+    expect(lines.every((l) => !l.visible)).toBe(true)
+
+    // no modifier: only the half toward +X
+    scale.updateVisuals('+X', null, theme, show, { alt: false, shift: false })
+    const visible = lines.filter((l) => l.visible)
+    expect(visible.length).toBe(1)
+    const pos = visible[0]!.geometry.getAttribute('position').array
+    expect(Number(pos[3])).toBeGreaterThan(0) // end.x > 0
+    expect(Number(pos[4])).toBeCloseTo(0)
+    expect(Number(pos[5])).toBeCloseTo(0)
+
+    // alt: full X axis (both halves)
+    scale.updateVisuals('+X', null, theme, show, { alt: true, shift: false })
+    expect(lines.filter((l) => l.visible).length).toBe(2)
+
+    // shift: all axes
+    scale.updateVisuals('+X', null, theme, show, { alt: false, shift: true })
+    expect(lines.filter((l) => l.visible).length).toBe(6)
+
+    scale.updateVisuals(null, '+X', theme, show, { alt: false, shift: false })
+    const dragging = lines.filter((l) => l.visible)
+    expect(dragging.length).toBe(1)
+    expect((dragging[0]!.material as LineDashedMaterial).color.getHex()).toBe(theme.colors.active)
+  })
+
+  it('uses the same dashed scale guides in dedicated scale mode', () => {
+    gizmo.setMode('scale')
+    gizmo.updateMatrixWorld(true)
+    const scale = modeChildren().find((c) => c.mode === 'scale')!
+    const show = { x: true, y: true, z: true }
+    const theme = gizmo.getTheme()
+    const lines = scale.visual.children.filter((o): o is Line => o.type === 'Line')
+    const shafts = scale.getVisualHandles().filter((h) => h.geometry.type === 'CylinderGeometry')
+
+    scale.updateVisuals(null, null, theme, show)
+    expect(shafts.some((h) => h.visible)).toBe(true)
+    expect(lines.every((l) => !l.visible)).toBe(true)
+
+    scale.updateVisuals('+Y', null, theme, show, { alt: false, shift: false })
+    expect(shafts.every((h) => !h.visible)).toBe(true)
+    expect(lines.filter((l) => l.visible).length).toBe(1)
+  })
+
+  it('keeps translate arrows inside the rotate ring and scale cubes outside', () => {
+    const { arrowLength, ringRadius, scaleHandleDistance, scaleCubeSize } = gizmo.getTheme().sizes
+    expect(arrowLength).toBeLessThan(ringRadius)
+    expect(scaleHandleDistance - scaleCubeSize / 2).toBeGreaterThan(ringRadius)
+  })
+
+  it('prefers translate over rotate when hovering an arrow near a ring', () => {
+    gizmo.setMode('combined')
+    let op: string | null = null
+    gizmo.addEventListener('mouseDown', (e) => {
+      op = e.mode
+    })
+    // mid-shaft: also near the Y ring's picker, which used to win on distance
+    drag(handlePoint(X, 0.4), 40, 0)
+    expect(op).toBe('translate')
+  })
+
+  it('keeps rotate sticky while the ring is still under the pointer', () => {
+    gizmo.setMode('combined')
+    gizmo.updateMatrixWorld(true)
+    const r = gizmo.getTheme().sizes.ringRadius * gizmo.scale.x
+    // start on the ring away from axes, then drift toward +X where translate
+    // would normally steal the hit
+    const onRing = toScreen(
+      cube.getWorldPosition(new Vector3()).add(new Vector3(r * Math.cos(1.3), 0, r * Math.sin(1.3))),
+    )
+    move(onRing)
+
+    const towardAxis = toScreen(
+      cube.getWorldPosition(new Vector3()).add(new Vector3(r * Math.cos(0.35), 0, r * Math.sin(0.35))),
+    )
+    move(towardAxis)
+
+    let op: string | null = null
+    gizmo.addEventListener('mouseDown', (e) => {
+      op = e.mode
+    })
+    down(towardAxis)
+    expect(op).toBe('rotate')
+    up(towardAxis)
+  })
+
+  it('prefers scale over rotate when both pickers hit', () => {
+    gizmo.setMode('combined')
+    let op: string | null = null
+    gizmo.addEventListener('mouseDown', (e) => {
+      op = e.mode
+    })
+    drag(pickerScreen('scale', '+X'), 40, 0)
+    expect(op).toBe('scale')
   })
 })

@@ -1,4 +1,7 @@
-export type GizmoMode = 'translate' | 'rotate' | 'scale'
+/** Per-handle / per-drag operation (never `'combined'`). */
+export type GizmoOperation = 'translate' | 'rotate' | 'scale'
+/** Active tool mode on {@link TransformGizmo}. */
+export type GizmoMode = GizmoOperation | 'combined'
 export type GizmoSpace = 'world' | 'local'
 
 /**
@@ -42,7 +45,7 @@ export type AxisId =
   | '-YZ'
 
 export interface HandleInfo {
-  mode: GizmoMode
+  mode: GizmoOperation
   axis: AxisId
   picker?: boolean
 }
@@ -55,8 +58,8 @@ export interface GizmoEventMap {
   objectChange: Record<string, unknown>
   /** a drag started (true) or ended (false) — use it to gate orbit controls */
   'dragging-changed': { value: boolean }
-  mouseDown: { mode: GizmoMode }
-  mouseUp: { mode: GizmoMode }
+  mouseDown: { mode: GizmoOperation }
+  mouseUp: { mode: GizmoOperation }
   hoveron: { axis: AxisId }
   hoveroff: Record<string, unknown>
 }

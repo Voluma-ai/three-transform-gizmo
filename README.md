@@ -4,29 +4,17 @@
 [![npm](https://img.shields.io/npm/v/@voluma/three-transform-gizmo.svg)](https://www.npmjs.com/package/@voluma/three-transform-gizmo)
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 
-A custom transform gizmo for [three.js](https://threejs.org) — a near drop-in
-replacement for `TransformControls` with **extrude-style scaling**, **rotation
-angle feedback**, and **themeable styling**.
+A near drop-in replacement for `TransformControls` with **extrude-style scaling**,  
+**rotation angle feedback**, and **themeable styling**.
 
-- **Extrude scaling.** Handles sit on _both_ ends of every axis and on both
-  corners of every plane. Dragging a handle anchors the opposite face/corner in
-  world space, so the object grows in one direction — like face-dragging in
-  Blender — instead of scaling around its center. Hold <kbd>Shift</kbd> to
-  constrain proportions, or <kbd>Alt</kbd> to scale
-  from the center instead. A center cube scales uniformly.
-- **Per-plane scaling.** `+XY`, `-XZ`, … handles scale two axes at once,
-  anchored on the opposite corner.
-- **Rotation with angle feedback.** Three axis rings plus a screen-space ring,
-  with a translucent "pie slice" showing the swept angle while dragging. Opt in
-  to a live degrees readout (e.g. `45°`) via `theme.showSectorLabel`. Hold
-  <kbd>Shift</kbd> for 15° snapping (configurable), or set a permanent
-  `rotationSnap`.
-- **Themeable.** Colors, opacities and geometry sizes come from a theme object
-  that can be swapped at runtime.
-
-Anchored scaling is correct for objects inside rotated and non-uniformly scaled
-parents, for meshes with off-center geometry, and for mirrored (negative-scale)
-objects — the anchor is derived from the object's local bounding box.
+- **Extrude scaling.** Hold Shift to constrain proportions, or Alt to scale from the  
+  center instead. A center cube scales uniformly.
+- **Per-plane scaling.** `+XY`, `-XZ`, … handles scale two axes at once, anchored on  
+  the opposite corner.
+- **Rotation with angle feedback.** Three axis rings plus a screen-space ring,  
+  Optional live degrees readout (e.g. `45°`). Hold Shift for snapping.
+- **Themeable.** Colors, opacities and geometry sizes come from a theme object.
+- **Combined mode.** Translate, rotate and scale in one view.
 
 ## Installation
 
@@ -77,7 +65,7 @@ renderer.setAnimationLoop(() => renderer.render(scene, camera))
 Switching modes and snapping:
 
 ```ts
-gizmo.setMode('scale') // 'translate' | 'rotate' | 'scale'
+gizmo.setMode('scale') // 'translate' | 'rotate' | 'scale' | 'combined'
 gizmo.setSpace('local') // 'world' | 'local'
 gizmo.setTranslationSnap(1) // world units, null to disable
 gizmo.setRotationSnap(Math.PI / 12)
@@ -99,11 +87,6 @@ gizmo.setScaleSnap(0.25)
 | <kbd>Shift</kbd> + scale drag          | constrain proportions — every axis takes the dragged axis' ratio         |
 | <kbd>Shift</kbd> + rotate drag         | snap to `theme.snapping.shiftRotationSnapDeg` (default 15°)              |
 
-Modifier keys are read from the pointer event, so they take effect on the next
-pointer move rather than the instant the key is pressed. Because every move
-recomputes the transform from the state captured at pointer-down, toggling a
-modifier mid-drag never causes a jump.
-
 ## API
 
 ### `new TransformGizmo(camera, domElement, options?)`
@@ -117,22 +100,22 @@ modifier mid-drag never causes a jump.
 
 ### Methods
 
-| Method                          | Description                                                      |
-| ------------------------------- | ---------------------------------------------------------------- |
-| `attach(object)`                | control `object`; makes the gizmo visible                        |
-| `detach()`                      | stop controlling; ends an active drag and hides the gizmo        |
-| `setMode(mode)`                 | `'translate' \| 'rotate' \| 'scale'` (also settable via `.mode`) |
-| `setSpace(space)`               | `'world' \| 'local'` (also settable via `.space`)                |
-| `setScaleAnchor(anchor)`        | `'opposite' \| 'center'` (also settable via `.scaleAnchor`)      |
-| `setTranslationSnap(n \| null)` | grid snap for translation, in world units                        |
-| `setRotationSnap(rad \| null)`  | permanent rotation snap, in radians                              |
-| `setScaleSnap(n \| null)`       | snap for the resulting scale value                               |
-| `setSize(n)`                    | overall gizmo size multiplier                                    |
-| `setTheme(partial)`             | merge a partial theme and rebuild the handles                    |
-| `getTheme()`                    | the resolved theme currently in use                              |
-| `getRaycaster()`                | the instance's `Raycaster`, e.g. to set `.layers`                |
-| `reset()`                       | cancel the active drag and restore the transform from drag start |
-| `dispose()`                     | remove DOM listeners and free geometries/materials               |
+| Method                          | Description                                                                    |
+| ------------------------------- | ------------------------------------------------------------------------------ |
+| `attach(object)`                | control `object`; makes the gizmo visible                                      |
+| `detach()`                      | stop controlling; ends an active drag and hides the gizmo                      |
+| `setMode(mode)`                 | `'translate' \| 'rotate' \| 'scale' \| 'combined'` (also settable via `.mode`) |
+| `setSpace(space)`               | `'world' \| 'local'` (also settable via `.space`)                              |
+| `setScaleAnchor(anchor)`        | `'opposite' \| 'center'` (also settable via `.scaleAnchor`)                    |
+| `setTranslationSnap(n \| null)` | grid snap for translation, in world units                                      |
+| `setRotationSnap(rad \| null)`  | permanent rotation snap, in radians                                            |
+| `setScaleSnap(n \| null)`       | snap for the resulting scale value                                             |
+| `setSize(n)`                    | overall gizmo size multiplier                                                  |
+| `setTheme(partial)`             | merge a partial theme and rebuild the handles                                  |
+| `getTheme()`                    | the resolved theme currently in use                                            |
+| `getRaycaster()`                | the instance's `Raycaster`, e.g. to set `.layers`                              |
+| `reset()`                       | cancel the active drag and restore the transform from drag start               |
+| `dispose()`                     | remove DOM listeners and free geometries/materials                             |
 
 Changing mode, space, `enabled`, or the theme during a drag safely ends that
 drag first (emitting `mouseUp` and `dragging-changed: false`).
@@ -183,43 +166,8 @@ const gizmo = new TransformGizmo(camera, renderer.domElement, {
 gizmo.setTheme({ colors: { sector: 0x56ccf2 } }) // partial update at runtime
 ```
 
-`setTheme()` rebuilds the handle meshes, so prefer setting it on state changes
+`setTheme()` rebuilds the handle meshes, so prefer setting it on state changes  
 rather than every frame.
-
-### Theme reference
-
-| `colors`           | Default                              |                                               |
-| ------------------ | ------------------------------------ | --------------------------------------------- |
-| `x` / `y` / `z`    | `0xe5484d` / `0x30a46c` / `0x0091ff` | per-axis handle colors                        |
-| `screen`           | `0xe0e0e0`                           | screen-space ring and center translate handle |
-| `uniform`          | `0xffffff`                           | uniform-scale center cube                     |
-| `hover` / `active` | `0xffd60a`                           | hovered / dragged handle tint                 |
-| `sector`           | `0xffd60a`                           | rotation angle sector fill                    |
-| `sectorLabel`      | `0xffd60a`                           | degrees readout inside the angle sector       |
-
-| `opacity`                   | Default |                                      |
-| --------------------------- | ------- | ------------------------------------ |
-| `idle` / `hover` / `active` | `1`     | handle opacity per state             |
-| `inactiveWhileDragging`     | `0.15`  | other handles fade out during a drag |
-| `sector`                    | `0.25`  | angle sector fill                    |
-
-| `sizes`                                               | Default                |                                                    |
-| ----------------------------------------------------- | ---------------------- | -------------------------------------------------- |
-| `gizmoSize`                                           | `1`                    | base multiplier (combined with `size`)             |
-| `arrowLength` / `arrowHeadLength` / `arrowHeadRadius` | `0.8` / `0.2` / `0.06` | translate arrows                                   |
-| `axisLineRadius`                                      | `0.00625`              | axis shaft thickness                               |
-| `planeOffset` / `planeSize`                           | `0.45` / `0.22`        | plane handle placement and size                    |
-| `ringRadius` / `ringTube`                             | `0.75` / `0.0075`      | rotate rings                                       |
-| `screenRingRadius`                                    | `0.95`                 | outer screen-space ring                            |
-| `scaleCubeSize` / `scaleHandleDistance`               | `0.1` / `0.8`          | scale handles                                      |
-| `pickerScale`                                         | `2.5`                  | invisible hit-area multiplier                      |
-| `sectorLabelSize`                                     | `0.16`                 | relative degrees-readout text height (gizmo units) |
-
-| Other                           | Default |                                                             |
-| ------------------------------- | ------- | ----------------------------------------------------------- |
-| `showSectorLabel`               | `false` | show degrees readout inside the angle sector while rotating |
-| `snapping.shiftRotationSnapDeg` | `15`    | <kbd>Shift</kbd> rotation snap                              |
-| `renderOrder`                   | `999`   | handles render on top (`depthTest: false`)                  |
 
 ## Migrating from `TransformControls`
 
@@ -252,7 +200,7 @@ A typical migration is two lines: construct `TransformGizmo` instead of
   objects with no renderable geometry fall back to a unit box.
 - **Add the gizmo to the scene root.** It writes its own world position and
   orientation each frame, so parenting it to a transformed group will misalign it.
-- **Call `dispose()`** when you are done — it owns DOM listeners on `domElement`.
+- **Call** `dispose()` when you are done — it owns DOM listeners on `domElement`.
 
 ## Compatibility
 

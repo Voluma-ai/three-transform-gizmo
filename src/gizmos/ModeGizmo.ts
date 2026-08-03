@@ -1,7 +1,10 @@
 import { Group, Object3D } from 'three'
 import type { GizmoTheme } from '../theme'
-import type { AxisId, GizmoMode } from '../types'
+import type { AxisId, GizmoOperation } from '../types'
 import type { HandleMesh } from './HandleFactory'
+
+/** Full tool UI, or the stripped layout used when all three modes share the view. */
+export type GizmoLayout = 'full' | 'combined'
 
 /**
  * Base for the per-mode gizmo groups. Holds a `visual` group and an invisible
@@ -9,9 +12,11 @@ import type { HandleMesh } from './HandleFactory'
  * userData.handle = { mode, axis, baseColor }.
  */
 export abstract class ModeGizmo extends Object3D {
-  abstract readonly mode: GizmoMode
+  abstract readonly mode: GizmoOperation
   readonly visual = new Group()
   readonly picker = new Group()
+  /** `'combined'` hides handles that clutter the multi-tool view. */
+  layout: GizmoLayout = 'full'
 
   constructor() {
     super()
@@ -20,7 +25,14 @@ export abstract class ModeGizmo extends Object3D {
   }
 
   getPickers(): HandleMesh[] {
-    return this.picker.children as HandleMesh[]
+    return (this.picker.children as HandleMesh[]).filter(
+      (p) => this.layout !== 'combined' || !this.hiddenInCombined(p.userData.handle.axis),
+    )
+  }
+
+  /** axes suppressed when {@link layout} is `'combined'` (override in subclasses) */
+  protected hiddenInCombined(_axis: AxisId): boolean {
+    return false
   }
 
   getVisualHandles(): HandleMesh[] {
@@ -46,10 +58,11 @@ export abstract class ModeGizmo extends Object3D {
     dragAxis: AxisId | null,
     theme: GizmoTheme,
     show: { x: boolean; y: boolean; z: boolean },
+    _mods?: { alt: boolean; shift: boolean },
   ): void {
     for (const h of this.getVisualHandles()) {
       const { axis, baseColor, baseOpacity } = h.userData.handle
-      const visible = ModeGizmo.axisShown(axis, show)
+      const visible = ModeGizmo.axisShown(axis, show) && !(this.layout === 'combined' && this.hiddenInCombined(axis))
       h.visible = visible
       if (!visible) continue
       if (dragAxis) {

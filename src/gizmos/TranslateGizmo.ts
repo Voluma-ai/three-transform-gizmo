@@ -1,7 +1,7 @@
 import { CylinderGeometry, Euler, Vector3 } from 'three'
 import type { GizmoTheme } from '../theme'
 import type { AxisId } from '../types'
-import { geo, makeHandle } from './HandleFactory'
+import { geo, halfOverhangRadius, makeHandle } from './HandleFactory'
 import { ModeGizmo } from './ModeGizmo'
 
 const AXES: { axis: AxisId; letter: 'x' | 'y' | 'z'; rot: Euler; dir: Vector3 }[] = [
@@ -40,13 +40,9 @@ export class TranslateGizmo extends ModeGizmo {
         head.position.copy(dir).multiplyScalar(sign * (t.sizes.arrowLength - t.sizes.arrowHeadLength / 2))
         this.visual.add(head)
 
+        const pickR = halfOverhangRadius(t.sizes.arrowHeadRadius, t.sizes.arrowHeadRadius * t.sizes.pickerScale)
         const picker = makeHandle(
-          new CylinderGeometry(
-            t.sizes.arrowHeadRadius * t.sizes.pickerScale,
-            t.sizes.arrowHeadRadius * t.sizes.pickerScale,
-            t.sizes.arrowLength,
-            6,
-          ),
+          new CylinderGeometry(pickR, pickR, t.sizes.arrowLength, 6),
           0,
           'translate',
           axis,
@@ -81,5 +77,10 @@ export class TranslateGizmo extends ModeGizmo {
     this.visual.add(center)
     const centerPicker = makeHandle(geo.sphere(t.sizes.scaleCubeSize * 1.2), 0, 'translate', 'XYZ', t, true)
     this.picker.add(centerPicker)
+  }
+
+  /** plane quads sit in the same planes as rotate rings — drop them in combined */
+  protected override hiddenInCombined(axis: AxisId): boolean {
+    return axis.length === 2
   }
 }

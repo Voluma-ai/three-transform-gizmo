@@ -21,7 +21,7 @@ import { RotateGizmo } from './gizmos/RotateGizmo'
 import { ScaleGizmo } from './gizmos/ScaleGizmo'
 import { TranslateGizmo } from './gizmos/TranslateGizmo'
 import { defaultTheme, mergeTheme, type GizmoTheme, type PartialTheme } from './theme'
-import type { AxisId, GizmoEventMap, GizmoMode, GizmoSpace, ScaleAnchor } from './types'
+import type { AxisId, GizmoEventMap, GizmoMode, GizmoOperation, GizmoSpace, ScaleAnchor } from './types'
 
 export interface TransformGizmoOptions {
   theme?: PartialTheme
@@ -31,7 +31,7 @@ export interface TransformGizmoOptions {
 
 interface DragState {
   axis: AxisId
-  mode: GizmoMode
+  mode: GizmoOperation
   /** space captured at drag start, so the drag stays consistent */
   space: GizmoSpace
   pointerId: number
@@ -53,6 +53,18 @@ interface DragState {
   handleDistanceWorld: number
   /** false when the object has no measurable geometry, so no anchor can be derived */
   boundsKnown: boolean
+}
+
+interface PickedHandle {
+  mode: GizmoOperation
+  axis: AxisId
+}
+
+/** lower = preferred when several mode pickers intersect the same ray */
+const PICK_PRIORITY: Record<GizmoOperation, number> = {
+  translate: 0,
+  scale: 1,
+  rotate: 2,
 }
 
 const _pointer = new Vector2()
@@ -101,6 +113,8 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
   private _space: GizmoSpace = 'world'
   private _scaleAnchor: ScaleAnchor = 'opposite'
   private _axis: AxisId | null = null
+  /** operation of the hovered/dragged handle (needed when mode is `'combined'`) */
+  private _operation: GizmoOperation | null = null
   private _dragging = false
   private _theme: GizmoTheme
   private _drag: DragState | null = null
@@ -121,6 +135,7 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
   private _onPointerDown = (e: PointerEvent) => this.pointerDown(e)
   private _onPointerMove = (e: PointerEvent) => this.pointerMove(e)
   private _onPointerUp = (e: PointerEvent) => this.pointerUp(e)
+  private _onKeyChange = (e: KeyboardEvent) => this.keyChange(e)
 
   constructor(camera: Camera, domElement: HTMLElement, options: TransformGizmoOptions = {}) {
     super()
@@ -141,6 +156,8 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
     domElement.addEventListener('pointermove', this._onPointerMove)
     domElement.addEventListener('pointerup', this._onPointerUp)
     domElement.addEventListener('pointercancel', this._onPointerUp)
+    domElement.ownerDocument?.addEventListener('keydown', this._onKeyChange)
+    domElement.ownerDocument?.addEventListener('keyup', this._onKeyChange)
   }
 
   // ---------------------------------------------------------------- public API
@@ -164,6 +181,8 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
     this.endDrag()
     this._mode = mode
     this._axis = null
+    this._operation = null
+    this.applyModeLayout()
     this.dispatchEvent({ type: 'change' })
   }
 
@@ -231,6 +250,7 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
     this.object = null
     this.visible = false
     this._axis = null
+    this._operation = null
     this.dispatchEvent({ type: 'change' })
     return this
   }
@@ -274,6 +294,7 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
     this._sector = new AngleSector(this._theme)
     this._sector.setRadius(this._theme.sizes.ringRadius)
     this.add(this._translate, this._rotate, this._scale, this._sector)
+    this.applyModeLayout()
     this.dispatchEvent({ type: 'change' })
   }
 
@@ -283,6 +304,8 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
     this.domElement.removeEventListener('pointermove', this._onPointerMove)
     this.domElement.removeEventListener('pointerup', this._onPointerUp)
     this.domElement.removeEventListener('pointercancel', this._onPointerUp)
+    this.domElement.ownerDocument?.removeEventListener('keydown', this._onKeyChange)
+    this.domElement.ownerDocument?.removeEventListener('keyup', this._onKeyChange)
     this._translate.dispose()
     this._rotate.dispose()
     this._scale.dispose()
@@ -300,6 +323,14 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
       const useLocal = this._space === 'local' || this._mode === 'scale'
       this.quaternion.copy(useLocal ? this._worldQuaternion : _q1.identity())
 
+      // scale always sits on object-local axes; when combined+world the root is
+      // world-aligned, so counter-orient the scale child onto the object
+      if (this._mode === 'combined' && this._space === 'world') {
+        this._scale.quaternion.copy(this.quaternion).invert().multiply(this._worldQuaternion)
+      } else {
+        this._scale.quaternion.identity()
+      }
+
       this._factor = screenScaleFactor(this.camera, this._worldPosition)
       this.scale.setScalar((this._factor * this.size * this._theme.sizes.gizmoSize) / 4)
 
@@ -310,22 +341,46 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
       const camQ = this.camera.getWorldQuaternion(_q2)
       this._rotate.screenGroup.quaternion.copy(this.quaternion).invert().multiply(camQ)
 
-      this._translate.visible = this._mode === 'translate'
-      this._rotate.visible = this._mode === 'rotate'
-      this._scale.visible = this._mode === 'scale'
-
       const show = { x: this.showX, y: this.showY, z: this.showZ }
       const dragAxis = this._dragging ? this._axis : null
       const hoverAxis = this._dragging ? null : this._axis
-      this.activeGizmo().updateVisuals(hoverAxis, dragAxis, this._theme, show)
+      const activeOp = this._dragging ? (this._drag?.mode ?? null) : this._operation
+
+      this._translate.visible = this._mode === 'translate' || this._mode === 'combined'
+      this._rotate.visible = this._mode === 'rotate' || this._mode === 'combined'
+      this._scale.visible = this._mode === 'scale' || this._mode === 'combined'
+      // combined: hide other tools' visuals while translate/scale is active
+      // (rotate keeps the full multi-tool view so rings stay contextual)
+      const focus = this._mode === 'combined' ? activeOp : null
+      const solo = focus === 'translate' || focus === 'scale'
+      this._translate.visual.visible = !solo || focus === 'translate'
+      this._rotate.visual.visible = !solo // rotate never solos; hide when translate/scale focused
+      this._scale.visual.visible = !solo || focus === 'scale'
+
+      const mods = { alt: this._altKey, shift: this._shiftKey }
+      for (const g of this.visibleModeGizmos()) {
+        const match = activeOp === g.mode
+        g.updateVisuals(match ? hoverAxis : null, match ? dragAxis : null, this._theme, show, mods)
+      }
     }
     super.updateMatrixWorld(force)
   }
 
   // ---------------------------------------------------------------- pointers
 
-  private activeGizmo(): ModeGizmo {
-    return this._mode === 'translate' ? this._translate : this._mode === 'rotate' ? this._rotate : this._scale
+  private visibleModeGizmos(): ModeGizmo[] {
+    const out: ModeGizmo[] = []
+    if (this._translate.visible) out.push(this._translate)
+    if (this._rotate.visible) out.push(this._rotate)
+    if (this._scale.visible) out.push(this._scale)
+    return out
+  }
+
+  private applyModeLayout(): void {
+    const layout = this._mode === 'combined' ? 'combined' : 'full'
+    this._translate.layout = layout
+    this._rotate.layout = layout
+    this._scale.layout = layout
   }
 
   private setRayFromEvent(event: PointerEvent): void {
@@ -337,35 +392,66 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
     this._raycaster.setFromCamera(_pointer, this.camera)
   }
 
-  private pickAxis(event: PointerEvent): AxisId | null {
+  private pickHandle(event: PointerEvent): PickedHandle | null {
     // make sure handle world matrices reflect the current camera/object state:
     // picking can happen before the app's first render after attach()
     this.updateMatrixWorld(true)
     this.setRayFromEvent(event)
     const show = { x: this.showX, y: this.showY, z: this.showZ }
-    const pickers = this.activeGizmo()
-      .getPickers()
-      .filter((p) => ModeGizmo.axisShown(p.userData.handle.axis, show))
+    const pickers = this.visibleModeGizmos().flatMap((g) =>
+      g.getPickers().filter((p) => ModeGizmo.axisShown(p.userData.handle.axis, show)),
+    )
     const hits = this._raycaster.intersectObjects(pickers, false)
-    const hit = hits[0]
-    return hit ? (hit.object as HandleMesh).userData.handle.axis : null
+    if (hits.length === 0) return null
+
+    const handleOf = (h: (typeof hits)[number]) => (h.object as HandleMesh).userData.handle
+
+    // once a rotate ring is the active hover, keep it while the ray still
+    // hits any rotate picker — avoids flicker onto overlapping translate/scale
+    if (!this._dragging && this._operation === 'rotate') {
+      let bestRotate: (typeof hits)[number] | null = null
+      for (const h of hits) {
+        if (handleOf(h).mode !== 'rotate') continue
+        if (!bestRotate || h.distance < bestRotate.distance) bestRotate = h
+      }
+      if (bestRotate) {
+        const { mode, axis } = handleOf(bestRotate)
+        return { mode, axis }
+      }
+    }
+
+    // default: translate beats scale beats rotate
+    let best = hits[0]!
+    let bestPri = PICK_PRIORITY[handleOf(best).mode]
+    for (let i = 1; i < hits.length; i++) {
+      const h = hits[i]!
+      const pri = PICK_PRIORITY[handleOf(h).mode]
+      if (pri < bestPri || (pri === bestPri && h.distance < best.distance)) {
+        best = h
+        bestPri = pri
+      }
+    }
+    const { mode, axis } = handleOf(best)
+    return { mode, axis }
   }
 
   /** end an active drag (pointer up, detach, disable, theme rebuild) */
   private endDrag(): void {
     if (!this._dragging) return
+    const op = this._drag?.mode ?? this._operation ?? 'translate'
     this._dragging = false
     this._drag = null
     this._sector.hide()
-    this.dispatchEvent({ type: 'mouseUp', mode: this._mode })
+    this.dispatchEvent({ type: 'mouseUp', mode: op })
     this.dispatchEvent({ type: 'dragging-changed', value: false })
     this.dispatchEvent({ type: 'change' })
   }
 
   private pointerDown(event: PointerEvent): void {
     if (!this._enabled || !this.object || this._dragging || event.button !== 0) return
-    const axis = this.pickAxis(event)
-    if (!axis) return
+    const picked = this.pickHandle(event)
+    if (!picked) return
+    const { mode, axis } = picked
     this._altKey = event.altKey
     this._shiftKey = event.shiftKey
 
@@ -387,13 +473,13 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
     }
 
     const plane = new Plane()
-    getDragPlane(this._mode, axis, this._space, worldQuaternionStart, worldPositionStart, this._eye, plane)
+    getDragPlane(mode, axis, this._space, worldQuaternionStart, worldPositionStart, this._eye, plane)
     this.setRayFromEvent(event)
     const startPoint = new Vector3()
     if (!intersectPlane(this._raycaster.ray, plane, startPoint)) return
 
     const rotationAxisWorld = new Vector3()
-    if (this._mode === 'rotate') {
+    if (mode === 'rotate') {
       if (axis === 'E') rotationAxisWorld.copy(this._eye)
       else {
         rotationAxisWorld.copy(UNIT[axis as 'X' | 'Y' | 'Z'])
@@ -405,7 +491,7 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
     const localCenterOffset = new Vector3()
     let handleDistanceWorld = 1
     let boundsKnown = true
-    if (this._mode === 'scale') {
+    if (mode === 'scale') {
       boundsKnown = this.computeLocalBounds(object, localHalfExtents, localCenterOffset)
       const gizmoScale = (this._factor * this.size * this._theme.sizes.gizmoSize) / 4
       const dist =
@@ -417,8 +503,8 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
 
     this._drag = {
       axis,
-      mode: this._mode,
-      space: this._mode === 'scale' ? 'local' : this._space,
+      mode,
+      space: mode === 'scale' ? 'local' : this._space,
       pointerId: event.pointerId,
       plane,
       startPoint,
@@ -440,29 +526,30 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
     }
 
     this._axis = axis
+    this._operation = mode
     this._dragging = true
-    if (this._mode === 'rotate') this.orientSector()
+    if (mode === 'rotate') this.orientSector()
     try {
       this.domElement.setPointerCapture(event.pointerId)
     } catch {
       // pointer already gone (pen lift / touch-cancel race) — drag ends on pointerup/cancel
     }
-    this.dispatchEvent({ type: 'mouseDown', mode: this._mode })
+    this.dispatchEvent({ type: 'mouseDown', mode })
     this.dispatchEvent({ type: 'dragging-changed', value: true })
     this.dispatchEvent({ type: 'change' })
   }
 
   private pointerMove(event: PointerEvent): void {
     if (!this._enabled || !this.object) return
+    this._altKey = event.altKey
+    this._shiftKey = event.shiftKey
     if (!this._dragging) {
       if (!event.isPrimary) return
-      this.updateHover(this.pickAxis(event))
+      this.updateHover(this.pickHandle(event))
       return
     }
     const drag = this._drag
     if (!drag || event.pointerId !== drag.pointerId) return
-    this._altKey = event.altKey
-    this._shiftKey = event.shiftKey
 
     this.setRayFromEvent(event)
     if (!intersectPlane(this._raycaster.ray, drag.plane, _v1)) return
@@ -476,18 +563,32 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
     this.dispatchEvent({ type: 'change' })
   }
 
+  private keyChange(event: KeyboardEvent): void {
+    if (!this._enabled || !this.object) return
+    const alt = event.altKey
+    const shift = event.shiftKey
+    if (alt === this._altKey && shift === this._shiftKey) return
+    this._altKey = alt
+    this._shiftKey = shift
+    // refresh dashed scale guides while hovering / dragging without moving
+    this.dispatchEvent({ type: 'change' })
+  }
+
   private pointerUp(event: PointerEvent): void {
     if (!this._dragging || (this._drag && event.pointerId !== this._drag.pointerId)) return
     if (this.domElement.hasPointerCapture(event.pointerId)) this.domElement.releasePointerCapture(event.pointerId)
     this.endDrag()
-    this.updateHover(this.pickAxis(event))
+    this.updateHover(this.pickHandle(event))
   }
 
-  /** apply a new hover axis, firing hoveron/hoveroff/change as needed */
-  private updateHover(axis: AxisId | null): void {
-    if (axis === this._axis) return
+  /** apply a new hover handle, firing hoveron/hoveroff/change as needed */
+  private updateHover(picked: PickedHandle | null): void {
+    const axis = picked?.axis ?? null
+    const operation = picked?.mode ?? null
+    if (axis === this._axis && operation === this._operation) return
     const prev = this._axis
     this._axis = axis
+    this._operation = operation
     if (axis) this.dispatchEvent({ type: 'hoveron', axis })
     else if (prev) this.dispatchEvent({ type: 'hoveroff' })
     this.dispatchEvent({ type: 'change' })

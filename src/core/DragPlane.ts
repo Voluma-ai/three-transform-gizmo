@@ -1,5 +1,5 @@
 import { Plane, Quaternion, Ray, Vector3 } from 'three'
-import type { AxisId, GizmoMode, GizmoSpace } from '../types'
+import type { AxisId, GizmoOperation, GizmoSpace } from '../types'
 
 const _v1 = new Vector3()
 const _v2 = new Vector3()
@@ -27,7 +27,7 @@ function axisDir(letter: 'X' | 'Y' | 'Z', space: GizmoSpace, worldQuaternion: Qu
  *   plane perpendicular to the eye.
  */
 export function getDragPlane(
-  mode: GizmoMode,
+  mode: GizmoOperation,
   axis: AxisId,
   space: GizmoSpace,
   worldQuaternion: Quaternion,
