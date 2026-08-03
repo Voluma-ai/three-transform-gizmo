@@ -134,7 +134,16 @@ for (const a of ['X', 'Y', 'Z'] as const) {
 
 const themeBox = document.getElementById('theme') as HTMLInputElement
 const degreesBox = document.getElementById('degrees') as HTMLInputElement
+const scalePctBox = document.getElementById('scalePct') as HTMLInputElement
+const scaleModsBox = document.getElementById('scaleMods') as HTMLInputElement
+const originDistBox = document.getElementById('originDist') as HTMLInputElement
 function applyTheme() {
+  const labelFlags = {
+    showSectorLabel: degreesBox.checked,
+    showScaleLabel: scalePctBox.checked,
+    showScaleModifiers: scaleModsBox.checked,
+    showOriginDistanceLabel: originDistBox.checked,
+  }
   gizmo.setTheme(
     themeBox.checked
       ? {
@@ -147,8 +156,13 @@ function applyTheme() {
             sector: 0x56ccf2,
             sectorLabel: 0x56ccf2,
           },
-          sizes: { scaleCubeSize: 0.13, ringTube: 0.019, arrowHeadRadius: 0.08 },
-          showSectorLabel: degreesBox.checked,
+          sizes: {
+            scaleCubeSize: 0.09,
+            ringTube: 0.0075,
+            axisLineRadius: 0.004,
+            arrowHeadRadius: 0.05,
+          },
+          ...labelFlags,
         }
       : {
           colors: {
@@ -161,12 +175,15 @@ function applyTheme() {
             sectorLabel: 0xffd60a,
           },
           sizes: { scaleCubeSize: 0.1, ringTube: 0.012, arrowHeadRadius: 0.06 },
-          showSectorLabel: degreesBox.checked,
+          ...labelFlags,
         },
   )
 }
 themeBox.onchange = applyTheme
 degreesBox.onchange = applyTheme
+scalePctBox.onchange = applyTheme
+scaleModsBox.onchange = applyTheme
+originDistBox.onchange = applyTheme
 
 // side-by-side compat check: swap in the stock TransformControls with the
 // exact same call sites (attach/setMode/setSpace/snaps/events)

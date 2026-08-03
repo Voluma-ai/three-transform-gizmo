@@ -70,8 +70,8 @@ const _tmp = new Vector3()
  * (or corner) opposite the grabbed handle stays fixed in world space.
  *
  * When proportional, that ratio is applied to all three axes rather than only
- * the dragged ones. The anchor still belongs to the dragged axes alone — the
- * axes that come along for the ride grow about the origin.
+ * the dragged ones, and the caller typically also sets centerAnchored so growth
+ * stays about the origin.
  */
 export function computeAnchoredScale(input: AnchoredScaleInput): AnchoredScaleResult {
   const { axes, sign } = parseScaleHandle(input.handle)

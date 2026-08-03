@@ -7,12 +7,13 @@
 A near drop-in replacement for `TransformControls` with **extrude-style scaling**,  
 **rotation angle feedback**, and **themeable styling**.
 
-- **Extrude scaling.** Hold Shift to constrain proportions, or Alt to scale from the  
-  center instead. A center cube scales uniformly.
-- **Per-plane scaling.** `+XY`, `-XZ`, … handles scale two axes at once, anchored on  
-  the opposite corner.
-- **Rotation with angle feedback.** Three axis rings plus a screen-space ring.
-  Optional live degrees readout (e.g. `45°`). Hold Shift for snapping.
+- **Extrude scaling.** Axis cubes pin the opposite face; plane quads and the center
+  cube scale from the origin. Shift = proportional + origin fixed; Alt flips the
+  configured anchor.
+- **Translate snapping.** Alt snaps the drag offset (`altTranslationSnap`); Shift
+  snaps dragged axes to integer world coordinates.
+- **Drag feedback.** Origin trail (gray disc + dashed line) while translating or
+  scaling. Optional `%`, Shift/Alt hints, degrees, and distance labels via theme.
 - **Themeable.** Colors, opacities and geometry sizes come from a theme object.
 - **Combined mode.** Translate, rotate and scale in one view.
 
@@ -81,10 +82,12 @@ gizmo.setScaleSnap(0.25)
 | Drag the center octahedron (translate) | move in the screen plane                                                 |
 | Drag a ring (rotate)                   | rotate about that axis; the outer white ring rotates about the view axis |
 | Drag an axis end-cube (scale)          | extrude along that axis — the opposite face stays put                    |
-| Drag a plane quad (scale)              | extrude two axes — the opposite corner stays put                         |
+| Drag a plane quad (scale)              | scale two axes from the center (origin stays fixed)                      |
 | Drag the center cube (scale)           | uniform scale from the center                                            |
 | <kbd>Alt</kbd> + scale drag            | use the anchor `scaleAnchor` is not set to (default: scale from center)  |
-| <kbd>Shift</kbd> + scale drag          | constrain proportions — every axis takes the dragged axis' ratio         |
+| <kbd>Alt</kbd> + translate drag        | snap the drag offset by `theme.snapping.altTranslationSnap` (default 1)  |
+| <kbd>Shift</kbd> + translate drag      | snap dragged axes to integer world coordinates                           |
+| <kbd>Shift</kbd> + scale drag          | constrain proportions and keep origin fixed (center-anchored)            |
 | <kbd>Shift</kbd> + rotate drag         | snap to `theme.snapping.shiftRotationSnapDeg` (default 15°)              |
 
 ## API
@@ -157,9 +160,12 @@ import { TransformGizmo, defaultTheme } from '@voluma/three-transform-gizmo'
 const gizmo = new TransformGizmo(camera, renderer.domElement, {
   theme: {
     colors: { x: 0xff6b9d, y: 0xa8e063, z: 0x56ccf2, hover: 0xffffff },
-    sizes: { scaleCubeSize: 0.13, ringTube: 0.025, sectorLabelSize: 0.2 },
+    sizes: { scaleCubeSize: 0.09, ringTube: 0.0075, axisLineRadius: 0.004, sectorLabelSize: 0.2 },
     snapping: { shiftRotationSnapDeg: 5 },
     showSectorLabel: true, // opt in to degrees readout while rotating
+    showScaleLabel: true, // opt in to relative % while scaling
+    showScaleModifiers: true, // opt in to Shift/Alt hints on scale axes
+    showOriginDistanceLabel: true, // opt in to distance while translating
   },
 })
 

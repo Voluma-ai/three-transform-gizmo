@@ -17,6 +17,7 @@ import { snapAngle } from './core/Snapping'
 import { AngleSector } from './gizmos/AngleSector'
 import type { HandleMesh } from './gizmos/HandleFactory'
 import { ModeGizmo } from './gizmos/ModeGizmo'
+import { OriginTrail } from './gizmos/OriginTrail'
 import { RotateGizmo } from './gizmos/RotateGizmo'
 import { ScaleGizmo } from './gizmos/ScaleGizmo'
 import { TranslateGizmo } from './gizmos/TranslateGizmo'
@@ -53,6 +54,8 @@ interface DragState {
   handleDistanceWorld: number
   /** false when the object has no measurable geometry, so no anchor can be derived */
   boundsKnown: boolean
+  /** relative scale ratio while dragging scale (1 = unchanged); null otherwise */
+  scaleRatio: number | null
 }
 
 interface PickedHandle {
@@ -90,7 +93,8 @@ const UNIT: Record<'X' | 'Y' | 'Z', Vector3> = { X: _unitX, Y: _unitY, Z: _unitZ
  * Custom transform gizmo — near drop-in replacement for three.js
  * TransformControls, with per-axis / per-plane "extrude" scaling (handles on
  * both ends of each axis; the opposite side stays anchored, Alt scales from
- * center), a rotation angle sector with Shift snapping, and themeable styling.
+ * center, Shift constrains proportions and keeps the origin fixed), a rotation
+ * angle sector with Shift snapping, and themeable styling.
  *
  * Add the instance to your scene. Dispatches the same event names as
  * TransformControls: change, objectChange, dragging-changed, mouseDown, mouseUp.
@@ -125,6 +129,7 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
   private _rotate: RotateGizmo
   private _scale: ScaleGizmo
   private _sector: AngleSector
+  private _originTrail: OriginTrail
 
   private _raycaster = new Raycaster()
   private _worldPosition = new Vector3()
@@ -149,7 +154,9 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
     this._scale = new ScaleGizmo(this._theme)
     this._sector = new AngleSector(this._theme)
     this._sector.setRadius(this._theme.sizes.ringRadius)
-    this.add(this._translate, this._rotate, this._scale, this._sector)
+    this._originTrail = new OriginTrail(this._theme)
+    this.add(this._translate, this._rotate, this._scale, this._sector, this._originTrail)
+    this.applyModeLayout()
     this.visible = false
 
     domElement.addEventListener('pointerdown', this._onPointerDown)
@@ -209,7 +216,7 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
    * Choose whether scale drags pin the face opposite the grabbed handle
    * ('opposite', the default extrude behaviour) or the object's origin
    * ('center', so scaling never moves the object). Holding Alt during a drag
-   * selects the other mode.
+   * selects the other mode. Holding Shift always keeps the origin fixed.
    */
   setScaleAnchor(anchor: ScaleAnchor): void {
     if (anchor === this._scaleAnchor) return
@@ -283,17 +290,19 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
     this.endDrag()
     this._theme = mergeTheme(this._theme, partial)
     // rebuild gizmos with new geometry sizes/colors
-    this.remove(this._translate, this._rotate, this._scale, this._sector)
+    this.remove(this._translate, this._rotate, this._scale, this._sector, this._originTrail)
     this._translate.dispose()
     this._rotate.dispose()
     this._scale.dispose()
     this._sector.dispose()
+    this._originTrail.dispose()
     this._translate = new TranslateGizmo(this._theme)
     this._rotate = new RotateGizmo(this._theme)
     this._scale = new ScaleGizmo(this._theme)
     this._sector = new AngleSector(this._theme)
     this._sector.setRadius(this._theme.sizes.ringRadius)
-    this.add(this._translate, this._rotate, this._scale, this._sector)
+    this._originTrail = new OriginTrail(this._theme)
+    this.add(this._translate, this._rotate, this._scale, this._sector, this._originTrail)
     this.applyModeLayout()
     this.dispatchEvent({ type: 'change' })
   }
@@ -310,6 +319,7 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
     this._rotate.dispose()
     this._scale.dispose()
     this._sector.dispose()
+    this._originTrail.dispose()
   }
 
   // ------------------------------------------------------------ frame update
@@ -357,13 +367,52 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
       this._rotate.visual.visible = !solo // rotate never solos; hide when translate/scale focused
       this._scale.visual.visible = !solo || focus === 'scale'
 
-      const mods = { alt: this._altKey, shift: this._shiftKey }
+      const mods = {
+        alt: this._altKey,
+        shift: this._shiftKey,
+        scaleRatio: this._dragging && this._drag?.mode === 'scale' ? this._drag.scaleRatio : null,
+      }
       for (const g of this.visibleModeGizmos()) {
         const match = activeOp === g.mode
         g.updateVisuals(match ? hoverAxis : null, match ? dragAxis : null, this._theme, show, mods)
       }
+
+      if (this._dragging && this._drag && (this._drag.mode === 'translate' || this._drag.mode === 'scale')) {
+        // Offset in gizmo-local space (avoid worldToLocal before matrixWorld is current).
+        _v1.copy(this._drag.worldPositionStart).sub(this._worldPosition)
+        _q1.copy(this.quaternion).invert()
+        _v1.applyQuaternion(_q1)
+        const s = this.scale.x
+        if (Math.abs(s) > 1e-12) _v1.multiplyScalar(1 / s)
+        const camQ = this.camera.getWorldQuaternion(_q2)
+        const worldDist = this._drag.worldPositionStart.distanceTo(this._worldPosition)
+        this._originTrail.update(
+          _v1,
+          camQ,
+          this.quaternion,
+          this.trailLineColors(this._drag.axis),
+          worldDist,
+          // Distance label is translate-only — during scale it competes with %.
+          this._drag.mode === 'translate',
+        )
+      } else {
+        this._originTrail.hide()
+      }
     }
     super.updateMatrixWorld(force)
+  }
+
+  /** Dotted trail colors: one for a single axis, two (alternating) for a plane. */
+  private trailLineColors(axis: AxisId): number[] {
+    const core = axis.replace(/^[+-]/, '')
+    const c = this._theme.colors
+    if (core === 'X') return [c.x]
+    if (core === 'Y') return [c.y]
+    if (core === 'Z') return [c.z]
+    if (core === 'XY') return [c.x, c.y]
+    if (core === 'XZ') return [c.x, c.z]
+    if (core === 'YZ') return [c.y, c.z]
+    return [c.originGhost]
   }
 
   // ---------------------------------------------------------------- pointers
@@ -381,6 +430,11 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
     this._translate.layout = layout
     this._rotate.layout = layout
     this._scale.layout = layout
+    // Dedicated scale pulls non-uniform cubes inward; combined keeps outer radius.
+    this._scale.compact = this._mode === 'scale'
+    // Dedicated translate stretches arrows to the dedicated-scale radius;
+    // combined keeps the short arrows inside the rotate ring.
+    this._translate.expanded = this._mode === 'translate'
   }
 
   private setRayFromEvent(event: PointerEvent): void {
@@ -457,6 +511,7 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
     this._dragging = false
     this._drag = null
     this._sector.hide()
+    this._originTrail.hide()
     this.dispatchEvent({ type: 'mouseUp', mode: op })
     this.dispatchEvent({ type: 'dragging-changed', value: false })
     this.dispatchEvent({ type: 'change' })
@@ -509,10 +564,7 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
     if (mode === 'scale') {
       boundsKnown = this.computeLocalBounds(object, localHalfExtents, localCenterOffset)
       const gizmoScale = (this._factor * this.size * this._theme.sizes.gizmoSize) / 4
-      const dist =
-        axis === 'XYZ' || axis.replace(/^[+-]/, '').length === 1
-          ? this._scale.handleDistance
-          : this._scale.planeHandleDistance
+      const dist = this._scale.axisHandleDistance(axis, this._shiftKey)
       handleDistanceWorld = Math.max(gizmoScale * dist, 1e-6)
     }
 
@@ -538,6 +590,7 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
       localCenterOffset,
       handleDistanceWorld,
       boundsKnown,
+      scaleRatio: mode === 'scale' ? 1 : null,
     }
 
     this._axis = axis
@@ -627,9 +680,44 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
     offset.applyQuaternion(drag.parentQuaternionInv).multiply(drag.parentScaleInv)
     object.position.copy(drag.positionStart).add(offset)
 
-    // snap the RESULTING position to the grid (TransformControls semantics),
-    // only on the axes involved in the drag
-    if (this.translationSnap) {
+    // Shift: snap resulting WORLD coordinates to integers on the dragged axes.
+    // Alt: snap the drag OFFSET (relative to positionStart) by altTranslationSnap.
+    // Otherwise: optional translationSnap on the resulting absolute position.
+    if (this._shiftKey) {
+      object.updateWorldMatrix(true, false)
+      object.getWorldPosition(_v2)
+      for (const l of ['X', 'Y', 'Z'] as const) {
+        if (drag.axis === 'XYZ' || bare.includes(l)) {
+          const k = l.toLowerCase() as 'x' | 'y' | 'z'
+          _v2[k] = Math.round(_v2[k])
+        }
+      }
+      if (object.parent) object.parent.worldToLocal(_v2)
+      object.position.copy(_v2)
+    } else if (this._altKey) {
+      const snap = this._theme.snapping.altTranslationSnap
+      if (snap) {
+        offset.copy(object.position).sub(drag.positionStart)
+        if (drag.space === 'local') {
+          offset.applyQuaternion(_q1.copy(drag.quaternionStart).invert())
+          for (const l of ['X', 'Y', 'Z'] as const) {
+            if (drag.axis === 'XYZ' || bare.includes(l)) {
+              const k = l.toLowerCase() as 'x' | 'y' | 'z'
+              offset[k] = Math.round(offset[k] / snap) * snap
+            }
+          }
+          offset.applyQuaternion(drag.quaternionStart)
+        } else {
+          for (const l of ['X', 'Y', 'Z'] as const) {
+            if (drag.axis === 'XYZ' || bare.includes(l)) {
+              const k = l.toLowerCase() as 'x' | 'y' | 'z'
+              offset[k] = Math.round(offset[k] / snap) * snap
+            }
+          }
+        }
+        object.position.copy(drag.positionStart).add(offset)
+      }
+    } else if (this.translationSnap) {
       const snap = this.translationSnap
       const p = object.position
       if (drag.space === 'local') {
@@ -703,11 +791,15 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
       localHalfExtents: drag.localHalfExtents,
       localCenterOffset: drag.localCenterOffset,
       handleDistanceWorld: drag.handleDistanceWorld,
-      // Alt selects the anchor the gizmo is NOT configured for. Uniform scaling
-      // is always centered, and without measurable bounds there is no opposite
-      // face to pin — shifting by a guessed extent would just slide the object.
+      // Alt selects the anchor the gizmo is NOT configured for. Shift (proportional)
+      // always keeps the origin fixed. Uniform XYZ, plane (multi-axis) handles, and
+      // unknown bounds are always centered.
       centerAnchored:
-        (this._scaleAnchor === 'center' ? !this._altKey : this._altKey) || drag.axis === 'XYZ' || !drag.boundsKnown,
+        this._shiftKey ||
+        (this._scaleAnchor === 'center' ? !this._altKey : this._altKey) ||
+        drag.axis === 'XYZ' ||
+        drag.axis.replace(/^[+-]/, '').length === 2 ||
+        !drag.boundsKnown,
       // Shift constrains proportions, as in most 2D and 3D editors. The center
       // cube already scales every axis, so the modifier is a no-op there.
       proportional: this._shiftKey,
@@ -715,6 +807,31 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
     })
     object.scale.copy(scale)
     object.position.copy(position)
+
+    // relative ratio for the % readout (mean over axes that actually changed)
+    const sx = drag.scaleStart.x !== 0 ? scale.x / drag.scaleStart.x : 1
+    const sy = drag.scaleStart.y !== 0 ? scale.y / drag.scaleStart.y : 1
+    const sz = drag.scaleStart.z !== 0 ? scale.z / drag.scaleStart.z : 1
+    if (this._shiftKey || drag.axis === 'XYZ') {
+      drag.scaleRatio = (sx + sy + sz) / 3
+    } else {
+      const core = drag.axis.replace(/^[+-]/, '')
+      let sum = 0
+      let n = 0
+      if (core.includes('X')) {
+        sum += sx
+        n++
+      }
+      if (core.includes('Y')) {
+        sum += sy
+        n++
+      }
+      if (core.includes('Z')) {
+        sum += sz
+        n++
+      }
+      drag.scaleRatio = n > 0 ? sum / n : 1
+    }
   }
 
   // ---------------------------------------------------------------- helpers

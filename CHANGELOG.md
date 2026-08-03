@@ -6,8 +6,24 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Origin trail while translating or scaling: gray disc at drag-start plus a
+  dashed line to the current origin (axis-colored; dual-dash on planes).
+- Optional theme labels (all off by default): `showScaleLabel` (`150%`),
+  `showScaleModifiers` (Shift/Alt hints), `showOriginDistanceLabel` (trail
+  distance while translating).
+- Translate modifiers: Alt snaps the drag offset by `snapping.altTranslationSnap`
+  (default `1`); Shift snaps dragged axes to integer world coordinates.
+- `sizes.scaleHandleDistanceNonUniform` (default `0.65`) for shorter non-uniform
+  scale axes; dedicated translate arrows match that radius.
+
 ### Changed
 
+- Plane scale handles always keep the origin fixed (center-anchored).
+- Shift + scale also forces center-anchored (in addition to proportional).
+- Translate / scale plane colors match `TransformControls` (perp-axis tint);
+  plane quads are smaller and closer (`planeSize` / `planeOffset`).
 - Sticky rotate hover yields when the pointer is over a translate arrow or scale
   cube _core_ (the drawn shape); the larger picker overhang still keeps rotate.
 

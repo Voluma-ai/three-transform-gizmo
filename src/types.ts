@@ -11,7 +11,8 @@ export type GizmoSpace = 'world' | 'local'
  * 'center'   — the object's origin stays fixed, so scaling never changes
  *              position. Use this when the host app stores position and scale
  *              separately, or forces uniform scale.
- * Holding Alt during a drag selects the other mode.
+ * Holding Alt during a drag selects the other mode. Holding Shift (proportional)
+ * always keeps the origin fixed.
  */
 export type ScaleAnchor = 'opposite' | 'center'
 
