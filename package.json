@@ -1,7 +1,7 @@
 {
   "name": "@voluma/three-transform-gizmo",
   "version": "0.6.0",
-  "description": "Custom three.js transform gizmo with per-axis/per-plane extrude scaling, angle-sector rotation and themeable styling. Near drop-in replacement for TransformControls.",
+  "description": "Custom three.js transform gizmo with per-axis/per-plane extrude scaling, combined mode, angle-sector rotation and themeable styling. Near drop-in replacement for TransformControls.",
   "keywords": [
     "three",
     "threejs",
@@ -13,7 +13,8 @@
     "3d",
     "webgl",
     "scale",
-    "extrude"
+    "extrude",
+    "combined"
   ],
   "license": "MIT",
   "author": "VOLUMA B.V. (https://voluma.ai)",
@@ -24,6 +25,9 @@
   "homepage": "https://github.com/Voluma-ai/three-transform-gizmo#readme",
   "bugs": {
     "url": "https://github.com/Voluma-ai/three-transform-gizmo/issues"
+  },
+  "engines": {
+    "node": ">=18"
   },
   "type": "module",
   "sideEffects": false,

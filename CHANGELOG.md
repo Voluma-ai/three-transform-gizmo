@@ -6,6 +6,14 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-08-03
+
+### Added
+
+- Combined mode (`setMode('combined')`): translate, rotate and scale handles
+  in one view. Per-handle events still report the concrete operation
+  (`GizmoOperation`), not `'combined'`.
+
 ### Changed
 
 - Translate arrows are shorter by default (`arrowLength` `0.55`, was `0.8`) and
@@ -116,7 +124,8 @@ Initial release, published to npm as `@voluma/three-transform-gizmo`.
   `latest`.
 - Ships ESM and CJS builds with TypeScript declarations for both.
 
-[Unreleased]: https://github.com/Voluma-ai/three-transform-gizmo/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/Voluma-ai/three-transform-gizmo/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/Voluma-ai/three-transform-gizmo/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/Voluma-ai/three-transform-gizmo/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/Voluma-ai/three-transform-gizmo/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/Voluma-ai/three-transform-gizmo/compare/v0.2.0...v0.3.0
