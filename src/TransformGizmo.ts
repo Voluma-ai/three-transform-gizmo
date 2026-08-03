@@ -354,7 +354,7 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
       const focus = this._mode === 'combined' ? activeOp : null
       const solo = focus === 'translate' || focus === 'scale'
       this._translate.visual.visible = !solo || focus === 'translate'
-      this._rotate.visual.visible = !solo || focus === 'rotate'
+      this._rotate.visual.visible = !solo // rotate never solos; hide when translate/scale focused
       this._scale.visual.visible = !solo || focus === 'scale'
 
       const mods = { alt: this._altKey, shift: this._shiftKey }

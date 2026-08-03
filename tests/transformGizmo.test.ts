@@ -1,5 +1,15 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { BoxGeometry, Group, Mesh, MeshBasicMaterial, PerspectiveCamera, Scene, Vector3 } from 'three'
+import {
+  BoxGeometry,
+  Group,
+  Line,
+  LineDashedMaterial,
+  Mesh,
+  MeshBasicMaterial,
+  PerspectiveCamera,
+  Scene,
+  Vector3,
+} from 'three'
 import { ModeGizmo } from '../src/gizmos/ModeGizmo'
 import { TransformGizmo } from '../src/TransformGizmo'
 import type { AxisId } from '../src/types'
@@ -646,7 +656,7 @@ describe('combined mode', () => {
     const scale = modeChildren().find((c) => c.mode === 'scale')!
     const show = { x: true, y: true, z: true }
     const theme = gizmo.getTheme()
-    const lines = scale.visual.children.filter((o) => o.type === 'Line')
+    const lines = scale.visual.children.filter((o): o is Line => o.type === 'Line')
     expect(lines.length).toBe(6)
 
     scale.updateVisuals(null, null, theme, show)
@@ -656,9 +666,7 @@ describe('combined mode', () => {
     scale.updateVisuals('+X', null, theme, show, { alt: false, shift: false })
     const visible = lines.filter((l) => l.visible)
     expect(visible.length).toBe(1)
-    const pos = (
-      visible[0] as { geometry: { getAttribute: (n: string) => { array: ArrayLike<number> } } }
-    ).geometry.getAttribute('position').array
+    const pos = visible[0]!.geometry.getAttribute('position').array
     expect(Number(pos[3])).toBeGreaterThan(0) // end.x > 0
     expect(Number(pos[4])).toBeCloseTo(0)
     expect(Number(pos[5])).toBeCloseTo(0)
@@ -674,9 +682,7 @@ describe('combined mode', () => {
     scale.updateVisuals(null, '+X', theme, show, { alt: false, shift: false })
     const dragging = lines.filter((l) => l.visible)
     expect(dragging.length).toBe(1)
-    expect((dragging[0] as { material: { color: { getHex: () => number } } }).material.color.getHex()).toBe(
-      theme.colors.active,
-    )
+    expect((dragging[0]!.material as LineDashedMaterial).color.getHex()).toBe(theme.colors.active)
   })
 
   it('uses the same dashed scale guides in dedicated scale mode', () => {
@@ -685,7 +691,7 @@ describe('combined mode', () => {
     const scale = modeChildren().find((c) => c.mode === 'scale')!
     const show = { x: true, y: true, z: true }
     const theme = gizmo.getTheme()
-    const lines = scale.visual.children.filter((o) => o.type === 'Line')
+    const lines = scale.visual.children.filter((o): o is Line => o.type === 'Line')
     const shafts = scale.getVisualHandles().filter((h) => h.geometry.type === 'CylinderGeometry')
 
     scale.updateVisuals(null, null, theme, show)
