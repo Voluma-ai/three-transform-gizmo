@@ -3,7 +3,7 @@ import { snapScale } from './Snapping'
 import type { AxisId } from '../types'
 
 export interface AnchoredScaleInput {
-  /** the grabbed scale handle, e.g. '+X', '-XY', 'XYZ' */
+  /** the grabbed scale handle, e.g. '+X', '+XY', 'XYZ' */
   handle: AxisId
   /** world-space drag offset (current plane point minus start plane point) */
   offsetWorld: Vector3

@@ -36,7 +36,8 @@ function localToWorld(p: Vector3, pos: Vector3, q: Quaternion, s: Vector3): Vect
 describe('parseScaleHandle', () => {
   it('parses signs and axes', () => {
     expect(parseScaleHandle('+X' as AxisId)).toEqual({ axes: ['x'], sign: 1 })
-    expect(parseScaleHandle('-YZ' as AxisId)).toEqual({ axes: ['y', 'z'], sign: -1 })
+    expect(parseScaleHandle('-Z' as AxisId)).toEqual({ axes: ['z'], sign: -1 })
+    expect(parseScaleHandle('+XY' as AxisId)).toEqual({ axes: ['x', 'y'], sign: 1 })
     expect(parseScaleHandle('XYZ' as AxisId)).toEqual({ axes: ['x', 'y', 'z'], sign: 0 })
   })
 })

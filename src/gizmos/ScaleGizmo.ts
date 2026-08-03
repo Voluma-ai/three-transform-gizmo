@@ -8,7 +8,7 @@ import {
   Vector3,
 } from 'three'
 import type { GizmoTheme } from '../theme'
-import type { AxisId } from '../types'
+import type { AxisId, GizmoShowFlags } from '../types'
 import { geo, halfOverhangRadius, makeHandle, type HandleMesh } from './HandleFactory'
 import { ModeGizmo } from './ModeGizmo'
 import { TextLabel } from './TextLabel'
@@ -52,12 +52,15 @@ export interface ScaleVisualMods {
   shift: boolean
   /** relative scale ratio while dragging; omit / null when not dragging */
   scaleRatio?: number | null
+  /** fade every handle (sibling tools during a rotate drag) */
+  dimAll?: boolean
 }
 
 /**
  * Scale gizmo with handles on BOTH ends of every axis (+X/-X, ...) for
- * extrude-style anchored scaling, plane handles on both diagonal corners
- * (+XY/-XY, ...), and a center cube for uniform scaling.
+ * extrude-style anchored scaling, one plane quad per plane in the positive
+ * corner (+XY/+XZ/+YZ, matching TransformControls), and a center cube for
+ * uniform scaling. Plane drags stay center-anchored.
  */
 export class ScaleGizmo extends ModeGizmo {
   readonly mode = 'scale' as const
@@ -91,7 +94,7 @@ export class ScaleGizmo extends ModeGizmo {
     this.handleDistance = t.sizes.scaleHandleDistance
     this.handleDistanceNonUniform = t.sizes.scaleHandleDistanceNonUniform
     this.planeHandleDistance = t.sizes.planeOffset
-    this.cubeSize = t.sizes.scaleCubeSize
+    this.cubeSize = t.sizes.gripSize
     this.showScaleLabel = t.showScaleLabel
     this.showScaleModifiers = t.showScaleModifiers
     this.labelColor = t.colors.sectorLabel
@@ -125,12 +128,12 @@ export class ScaleGizmo extends ModeGizmo {
         cube.rotation.copy(rot)
         this.visual.add(cube)
 
-        const pickR = halfOverhangRadius(t.sizes.scaleCubeSize / 2, t.sizes.scaleCubeSize * t.sizes.pickerScale * 0.6)
+        const pickR = halfOverhangRadius(this.cubeSize / 2, this.cubeSize * t.sizes.pickerScale * 0.6)
         const picker = makeHandle(geo.sphere(pickR), 0, 'scale', axis, t, true)
         picker.position.copy(cube.position)
         this.picker.add(picker)
 
-        const core = makeHandle(geo.sphere(t.sizes.scaleCubeSize / 2), 0, 'scale', axis, t, true)
+        const core = makeHandle(geo.sphere(this.cubeSize / 2), 0, 'scale', axis, t, true)
         core.position.copy(cube.position)
         core.userData.handle.core = true
         this.picker.add(core)
@@ -147,8 +150,8 @@ export class ScaleGizmo extends ModeGizmo {
         geoLine.setAttribute('position', new Float32BufferAttribute(linePositions, 3))
         const mat = new LineDashedMaterial({
           color: colors[letter],
-          dashSize: 0.06,
-          gapSize: 0.04,
+          dashSize: 0.039,
+          gapSize: 0.026,
           transparent: true,
           depthTest: false,
           depthWrite: false,
@@ -180,29 +183,28 @@ export class ScaleGizmo extends ModeGizmo {
       // Plane color = perpendicular axis (TransformControls): XY→Z, XZ→Y, YZ→X
       const perp = pair === 'XY' ? 'z' : pair === 'XZ' ? 'y' : 'x'
       const color = colors[perp]
-      for (const sign of [1, -1]) {
-        const axis = `${sign > 0 ? '+' : '-'}${pair}` as AxisId
-        const quad = makeHandle(geo.plane(t), color, 'scale', axis, t)
-        quad.rotation.copy(rot)
-        quad.position.copy(dir).multiplyScalar(this.planeHandleDistance * sign)
-        quad.material.opacity = 0.5
-        quad.userData.handle.baseOpacity = 0.5
-        this.visual.add(quad)
+      // One positive-corner quad per plane — same layout as TransformControls.
+      const axis = `+${pair}` as AxisId
+      const quad = makeHandle(geo.plane(t), color, 'scale', axis, t)
+      quad.rotation.copy(rot)
+      quad.position.copy(dir).multiplyScalar(this.planeHandleDistance)
+      quad.material.opacity = 0.5
+      quad.userData.handle.baseOpacity = 0.5
+      this.visual.add(quad)
 
-        const picker = makeHandle(geo.plane(t), 0, 'scale', axis, t, true)
-        picker.rotation.copy(rot)
-        picker.position.copy(quad.position)
-        picker.scale.setScalar(1.6)
-        this.picker.add(picker)
-      }
+      const picker = makeHandle(geo.plane(t), 0, 'scale', axis, t, true)
+      picker.rotation.copy(rot)
+      picker.position.copy(quad.position)
+      picker.scale.setScalar(1.6)
+      this.picker.add(picker)
     }
 
     const center = makeHandle(geo.cube(t), t.colors.uniform, 'scale', 'XYZ', t)
     center.scale.setScalar(1.15)
     this.visual.add(center)
-    const centerShapeR = (t.sizes.scaleCubeSize * 1.15) / 2
+    const centerShapeR = (this.cubeSize * 1.15) / 2
     const centerPicker = makeHandle(
-      geo.sphere(halfOverhangRadius(centerShapeR, t.sizes.scaleCubeSize * 1.5)),
+      geo.sphere(halfOverhangRadius(centerShapeR, this.cubeSize * 1.5)),
       0,
       'scale',
       'XYZ',
@@ -216,7 +218,7 @@ export class ScaleGizmo extends ModeGizmo {
 
     const labelOpts = {
       color: this.labelColor,
-      size: t.sizes.modifierLabelSize * 0.75,
+      size: t.sizes.labelSize * 0.75,
       renderOrder: t.renderOrder + 2,
     }
     for (const letter of ['X', 'Y', 'Z'] as const) {
@@ -234,7 +236,7 @@ export class ScaleGizmo extends ModeGizmo {
     }
     this.scaleLabel = new TextLabel({
       color: this.labelColor,
-      size: t.sizes.modifierLabelSize * 1.15,
+      size: t.sizes.labelSize * 1.15,
       renderOrder: t.renderOrder + 3,
     })
     this.scaleLabel.visible = false
@@ -260,10 +262,10 @@ export class ScaleGizmo extends ModeGizmo {
     hoverAxis: AxisId | null,
     dragAxis: AxisId | null,
     theme: GizmoTheme,
-    show: { x: boolean; y: boolean; z: boolean },
+    show: GizmoShowFlags,
     mods: ScaleVisualMods = { alt: false, shift: false },
   ): void {
-    super.updateVisuals(hoverAxis, dragAxis, theme, show)
+    super.updateVisuals(hoverAxis, dragAxis, theme, show, mods)
 
     const active = dragAxis ?? hoverAxis
     const guiding = active !== null
@@ -339,7 +341,7 @@ export class ScaleGizmo extends ModeGizmo {
     guiding: boolean,
     d: number,
     dStretched: number,
-    showAxes: { x: boolean; y: boolean; z: boolean },
+    showAxes: GizmoShowFlags,
     mods: ScaleVisualMods,
   ): void {
     for (const { label } of this.shiftLabels) label.visible = false

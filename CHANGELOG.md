@@ -15,12 +15,27 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   distance while translating).
 - Translate modifiers: Alt snaps the drag offset by `snapping.altTranslationSnap`
   (default `1`); Shift snaps dragged axes to integer world coordinates.
-- `sizes.scaleHandleDistanceNonUniform` (default `0.65`) for shorter non-uniform
+- `sizes.scaleHandleDistanceNonUniform` (default `0.4225`) for shorter non-uniform
   scale axes; dedicated translate arrows match that radius.
+- TransformControls API parity: `getMode()`, `getHelper()`, `setColors()`,
+  `connect()` / `disconnect()`, `showXY`/`showXZ`/`showYZ`/`showE`/`showXYZE`,
+  `minX`…`maxZ` translation clamps, `viewport` pointer mapping, and
+  `*-changed` events on property assign.
+- Rotate `XYZE` trackball free-rotate (center sphere picker; TransformControls
+  formula). Toggled with `showXYZE`; hidden in `combined` mode.
 
 ### Changed
 
+- Geometry defaults are ~30% larger than the post-`gizmoSize` removal baseline
+  so `setSize(1)` reads bigger while the API default stays `1`.
+- Rotation degrees use the same size as the scale % (`labelSize × 1.15`).
+- Renamed `sizes.modifierLabelSize` → `sizes.labelSize`; removed
+  `sizes.sectorLabelSize`.
+- Renamed `sizes.scaleCubeSize` → `sizes.gripSize` (scale cubes + translate
+  center octa).
 - Plane scale handles always keep the origin fixed (center-anchored).
+- Scale shows one plane quad per plane (`+XY`/`+XZ`/`+YZ`), matching
+  `TransformControls` (no opposite-diagonal quads).
 - Shift + scale also forces center-anchored (in addition to proportional).
 - Translate / scale plane colors match `TransformControls` (perp-axis tint);
   plane quads are smaller and closer (`planeSize` / `planeOffset`).
@@ -31,6 +46,11 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Near-zero scale starts use a sensitivity floor (0.1) so a later drag can grow
   the object again without needing absurd multiplicative ratios (extrude still
   pins the opposite face).
+
+### Removed
+
+- `sizes.gizmoSize` — use `setSize()` / `.size` instead (same as
+  `TransformControls`).
 
 ## [0.6.0] - 2026-08-03
 
@@ -87,7 +107,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   previous look.
 - Translate and scale axis shafts are half as thick by default to match:
   `theme.sizes.axisLineRadius` is now `0.00625` (was `0.0125`). Pick radii for
-  those handles derive from `arrowHeadRadius` / `scaleCubeSize`, so grabbing is
+  those handles derive from `arrowHeadRadius` / `gripSize`, so grabbing is
   unaffected. Override `sizes.axisLineRadius` to restore the previous look.
 
 ## [0.3.0] - 2026-07-29
