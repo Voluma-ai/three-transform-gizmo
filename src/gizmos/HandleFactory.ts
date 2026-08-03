@@ -16,7 +16,15 @@ import type { AxisId, GizmoOperation } from '../types'
 
 export interface HandleMesh extends Mesh<BufferGeometry, MeshBasicMaterial> {
   userData: {
-    handle: { mode: GizmoOperation; axis: AxisId; baseColor: number; baseOpacity: number; picker: boolean }
+    handle: {
+      mode: GizmoOperation
+      axis: AxisId
+      baseColor: number
+      baseOpacity: number
+      picker: boolean
+      /** shape-sized picker; sticky rotate yields to these over overhang pickers */
+      core?: boolean
+    }
   }
 }
 

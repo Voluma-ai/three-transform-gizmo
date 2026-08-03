@@ -406,13 +406,28 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
 
     const handleOf = (h: (typeof hits)[number]) => (h.object as HandleMesh).userData.handle
 
-    // once a rotate ring is the active hover, keep it while the ray still
-    // hits any rotate picker — avoids flicker onto overlapping translate/scale
+    // once a rotate ring is the active hover, keep it while the ray still hits
+    // a rotate picker — unless the pointer is over a translate/scale *core*
+    // (the drawn arrow/cube shape), which always overrides sticky rotate
     if (!this._dragging && this._operation === 'rotate') {
+      let bestCore: (typeof hits)[number] | null = null
+      let bestCorePri = Infinity
       let bestRotate: (typeof hits)[number] | null = null
       for (const h of hits) {
-        if (handleOf(h).mode !== 'rotate') continue
-        if (!bestRotate || h.distance < bestRotate.distance) bestRotate = h
+        const handle = handleOf(h)
+        if (handle.core && (handle.mode === 'translate' || handle.mode === 'scale')) {
+          const pri = PICK_PRIORITY[handle.mode]
+          if (!bestCore || pri < bestCorePri || (pri === bestCorePri && h.distance < bestCore.distance)) {
+            bestCore = h
+            bestCorePri = pri
+          }
+        } else if (handle.mode === 'rotate') {
+          if (!bestRotate || h.distance < bestRotate.distance) bestRotate = h
+        }
+      }
+      if (bestCore) {
+        const { mode, axis } = handleOf(bestCore)
+        return { mode, axis }
       }
       if (bestRotate) {
         const { mode, axis } = handleOf(bestRotate)
