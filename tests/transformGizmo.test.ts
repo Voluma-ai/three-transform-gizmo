@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { BoxGeometry, Group, Mesh, MeshBasicMaterial, PerspectiveCamera, Scene, Vector3 } from 'three'
+import { ModeGizmo } from '../src/gizmos/ModeGizmo'
 import { TransformGizmo } from '../src/TransformGizmo'
 import type { AxisId } from '../src/types'
 import { createFakeElement, HEIGHT, pointerEvent, WIDTH, type FakeElement } from './helpers/fakeDom'
@@ -475,5 +476,89 @@ describe('screen-constant sizing', () => {
     scene.updateMatrixWorld(true)
     gizmo.updateMatrixWorld(true)
     expect(gizmo.scale.x).toBeCloseTo(rigged, 6)
+  })
+})
+
+describe('combined mode', () => {
+  function modeChildren(): ModeGizmo[] {
+    return gizmo.children.filter((c): c is ModeGizmo => c instanceof ModeGizmo)
+  }
+
+  /** screen point of a specific mode's picker for the given axis */
+  function pickerScreen(mode: string, axis: AxisId): { x: number; y: number } {
+    gizmo.updateMatrixWorld(true)
+    const group = modeChildren().find((c) => c.mode === mode)!
+    const picker = group.getPickers().find((p) => p.userData.handle.axis === axis)
+    expect(picker).toBeTruthy()
+    return toScreen(picker!.getWorldPosition(new Vector3()))
+  }
+
+  it('shows translate, rotate, and scale gizmos together', () => {
+    gizmo.setMode('combined')
+    gizmo.updateMatrixWorld(true)
+    const modes = modeChildren()
+      .map((c) => c.mode)
+      .sort()
+    expect(modes).toEqual(['rotate', 'scale', 'translate'])
+    expect(modeChildren().every((c) => c.visible)).toBe(true)
+  })
+
+  it('hides the other gizmos again when leaving combined', () => {
+    gizmo.setMode('combined')
+    gizmo.updateMatrixWorld(true)
+    gizmo.setMode('translate')
+    gizmo.updateMatrixWorld(true)
+    for (const c of modeChildren()) {
+      expect(c.visible).toBe(c.mode === 'translate')
+    }
+  })
+
+  it('translates when a translate handle is dragged', () => {
+    gizmo.setMode('combined')
+    let op: string | null = null
+    gizmo.addEventListener('mouseDown', (e) => {
+      op = e.mode
+    })
+    // mid-shaft: away from the scale end-cube at 0.8
+    drag(handlePoint(X, 0.35), 60, 0)
+    expect(op).toBe('translate')
+    expect(cube.position.x).toBeGreaterThan(0.1)
+    expect(cube.scale.x).toBeCloseTo(1)
+  })
+
+  it('scales when a scale handle is dragged', () => {
+    gizmo.setMode('combined')
+    let op: string | null = null
+    gizmo.addEventListener('mouseDown', (e) => {
+      op = e.mode
+    })
+    drag(pickerScreen('scale', '+X'), 60, 0)
+    expect(op).toBe('scale')
+    expect(cube.scale.x).toBeGreaterThan(1.05)
+  })
+
+  it('rotates when a rotate handle is dragged', () => {
+    gizmo.setMode('combined')
+    gizmo.updateMatrixWorld(true)
+    let op: string | null = null
+    gizmo.addEventListener('mouseDown', (e) => {
+      op = e.mode
+    })
+    // point on the Y ring (XZ plane), off the cardinal axis handles
+    const r = gizmo.getTheme().sizes.ringRadius * gizmo.scale.x
+    const pt = toScreen(cube.getWorldPosition(new Vector3()).add(new Vector3(r * Math.cos(0.6), 0, r * Math.sin(0.6))))
+    drag(pt, 40, 30)
+    expect(op).toBe('rotate')
+    const angle = 2 * Math.acos(Math.min(1, Math.abs(cube.quaternion.w)))
+    expect(angle).toBeGreaterThan(0)
+  })
+
+  it('reports the handle operation on mouseDown/mouseUp, not combined', () => {
+    gizmo.setMode('combined')
+    const modes: string[] = []
+    gizmo.addEventListener('mouseDown', (e) => modes.push(`down:${e.mode}`))
+    gizmo.addEventListener('mouseUp', (e) => modes.push(`up:${e.mode}`))
+    drag(handlePoint(X, 0.35), 40, 0)
+    expect(modes).toEqual(['down:translate', 'up:translate'])
   })
 })

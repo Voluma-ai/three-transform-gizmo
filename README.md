@@ -77,7 +77,7 @@ renderer.setAnimationLoop(() => renderer.render(scene, camera))
 Switching modes and snapping:
 
 ```ts
-gizmo.setMode('scale') // 'translate' | 'rotate' | 'scale'
+gizmo.setMode('scale') // 'translate' | 'rotate' | 'scale' | 'combined'
 gizmo.setSpace('local') // 'world' | 'local'
 gizmo.setTranslationSnap(1) // world units, null to disable
 gizmo.setRotationSnap(Math.PI / 12)
@@ -117,22 +117,22 @@ modifier mid-drag never causes a jump.
 
 ### Methods
 
-| Method                          | Description                                                      |
-| ------------------------------- | ---------------------------------------------------------------- |
-| `attach(object)`                | control `object`; makes the gizmo visible                        |
-| `detach()`                      | stop controlling; ends an active drag and hides the gizmo        |
-| `setMode(mode)`                 | `'translate' \| 'rotate' \| 'scale'` (also settable via `.mode`) |
-| `setSpace(space)`               | `'world' \| 'local'` (also settable via `.space`)                |
-| `setScaleAnchor(anchor)`        | `'opposite' \| 'center'` (also settable via `.scaleAnchor`)      |
-| `setTranslationSnap(n \| null)` | grid snap for translation, in world units                        |
-| `setRotationSnap(rad \| null)`  | permanent rotation snap, in radians                              |
-| `setScaleSnap(n \| null)`       | snap for the resulting scale value                               |
-| `setSize(n)`                    | overall gizmo size multiplier                                    |
-| `setTheme(partial)`             | merge a partial theme and rebuild the handles                    |
-| `getTheme()`                    | the resolved theme currently in use                              |
-| `getRaycaster()`                | the instance's `Raycaster`, e.g. to set `.layers`                |
-| `reset()`                       | cancel the active drag and restore the transform from drag start |
-| `dispose()`                     | remove DOM listeners and free geometries/materials               |
+| Method                          | Description                                                                    |
+| ------------------------------- | ------------------------------------------------------------------------------ |
+| `attach(object)`                | control `object`; makes the gizmo visible                                      |
+| `detach()`                      | stop controlling; ends an active drag and hides the gizmo                      |
+| `setMode(mode)`                 | `'translate' \| 'rotate' \| 'scale' \| 'combined'` (also settable via `.mode`) |
+| `setSpace(space)`               | `'world' \| 'local'` (also settable via `.space`)                              |
+| `setScaleAnchor(anchor)`        | `'opposite' \| 'center'` (also settable via `.scaleAnchor`)                    |
+| `setTranslationSnap(n \| null)` | grid snap for translation, in world units                                      |
+| `setRotationSnap(rad \| null)`  | permanent rotation snap, in radians                                            |
+| `setScaleSnap(n \| null)`       | snap for the resulting scale value                                             |
+| `setSize(n)`                    | overall gizmo size multiplier                                                  |
+| `setTheme(partial)`             | merge a partial theme and rebuild the handles                                  |
+| `getTheme()`                    | the resolved theme currently in use                                            |
+| `getRaycaster()`                | the instance's `Raycaster`, e.g. to set `.layers`                              |
+| `reset()`                       | cancel the active drag and restore the transform from drag start               |
+| `dispose()`                     | remove DOM listeners and free geometries/materials                             |
 
 Changing mode, space, `enabled`, or the theme during a drag safely ends that
 drag first (emitting `mouseUp` and `dragging-changed: false`).

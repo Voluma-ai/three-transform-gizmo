@@ -91,10 +91,12 @@ const modeButtons: Record<GizmoMode, HTMLElement> = {
   translate: document.getElementById('mode-translate')!,
   rotate: document.getElementById('mode-rotate')!,
   scale: document.getElementById('mode-scale')!,
+  combined: document.getElementById('mode-combined')!,
 }
 function setMode(m: GizmoMode) {
   gizmo.setMode(m)
-  stock?.setMode(m)
+  // stock TransformControls has no combined mode
+  if (stock && m !== 'combined') stock.setMode(m)
   for (const [k, el] of Object.entries(modeButtons)) el.classList.toggle('active', k === m)
 }
 for (const m of Object.keys(modeButtons) as GizmoMode[]) modeButtons[m].onclick = () => setMode(m)
@@ -179,7 +181,8 @@ compareBox.onchange = async () => {
     const { TransformControls } = await import('three/examples/jsm/controls/TransformControls.js')
     stock = new TransformControls(camera, renderer.domElement)
     stock.attach(objects[current]!)
-    stock.setMode(gizmo.mode)
+    if (gizmo.mode !== 'combined') stock.setMode(gizmo.mode)
+    else stock.setMode('translate')
     stock.setSpace(gizmo.space)
     stock.setTranslationSnap(gizmo.translationSnap)
     stock.setRotationSnap(gizmo.rotationSnap)
@@ -204,6 +207,7 @@ window.addEventListener('keydown', (e) => {
   if (e.key === 't') setMode('translate')
   if (e.key === 'r') setMode('rotate')
   if (e.key === 's') setMode('scale')
+  if (e.key === 'a') setMode('combined')
   if (e.key === 'q') spaceBtn.click()
   if (e.key === 'Tab') {
     e.preventDefault()

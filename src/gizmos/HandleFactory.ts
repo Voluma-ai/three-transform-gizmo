@@ -12,10 +12,12 @@ import {
   TorusGeometry,
 } from 'three'
 import type { GizmoTheme } from '../theme'
-import type { AxisId, GizmoMode } from '../types'
+import type { AxisId, GizmoOperation } from '../types'
 
 export interface HandleMesh extends Mesh<BufferGeometry, MeshBasicMaterial> {
-  userData: { handle: { mode: GizmoMode; axis: AxisId; baseColor: number; baseOpacity: number; picker: boolean } }
+  userData: {
+    handle: { mode: GizmoOperation; axis: AxisId; baseColor: number; baseOpacity: number; picker: boolean }
+  }
 }
 
 export function gizmoMaterial(color: number, opacity: number): MeshBasicMaterial {
@@ -46,7 +48,7 @@ export function pickerMaterial(): MeshBasicMaterial {
 export function makeHandle(
   geometry: BufferGeometry,
   color: number,
-  mode: GizmoMode,
+  mode: GizmoOperation,
   axis: AxisId,
   theme: GizmoTheme,
   picker = false,

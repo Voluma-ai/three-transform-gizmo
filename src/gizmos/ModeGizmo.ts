@@ -1,6 +1,6 @@
 import { Group, Object3D } from 'three'
 import type { GizmoTheme } from '../theme'
-import type { AxisId, GizmoMode } from '../types'
+import type { AxisId, GizmoOperation } from '../types'
 import type { HandleMesh } from './HandleFactory'
 
 /**
@@ -9,7 +9,7 @@ import type { HandleMesh } from './HandleFactory'
  * userData.handle = { mode, axis, baseColor }.
  */
 export abstract class ModeGizmo extends Object3D {
-  abstract readonly mode: GizmoMode
+  abstract readonly mode: GizmoOperation
   readonly visual = new Group()
   readonly picker = new Group()
 
