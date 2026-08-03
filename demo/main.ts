@@ -86,6 +86,55 @@ for (const type of ['mouseDown', 'mouseUp', 'dragging-changed', 'hoveron'] as co
   })
 }
 
+// UI prefs — survive refresh via localStorage
+const PREFS_KEY = 'ttg-demo-prefs'
+type DemoPrefs = {
+  mode: GizmoMode
+  space: 'world' | 'local'
+  object: number
+  snap: boolean
+  showX: boolean
+  showY: boolean
+  showZ: boolean
+  theme: boolean
+  degrees: boolean
+  scalePct: boolean
+  scaleMods: boolean
+  originDist: boolean
+  compare: boolean
+}
+const defaultPrefs: DemoPrefs = {
+  mode: 'translate',
+  space: 'world',
+  object: 0,
+  snap: false,
+  showX: true,
+  showY: true,
+  showZ: true,
+  theme: false,
+  degrees: false,
+  scalePct: false,
+  scaleMods: false,
+  originDist: false,
+  compare: false,
+}
+function loadPrefs(): DemoPrefs {
+  try {
+    const raw = localStorage.getItem(PREFS_KEY)
+    if (!raw) return { ...defaultPrefs }
+    const parsed: unknown = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object') return { ...defaultPrefs }
+    return { ...defaultPrefs, ...(parsed as Partial<DemoPrefs>) }
+  } catch {
+    return { ...defaultPrefs }
+  }
+}
+function savePrefs(patch: Partial<DemoPrefs>) {
+  const next = { ...loadPrefs(), ...patch }
+  localStorage.setItem(PREFS_KEY, JSON.stringify(next))
+}
+const prefs = loadPrefs()
+
 // UI
 const modeButtons: Record<GizmoMode, HTMLElement> = {
   translate: document.getElementById('mode-translate')!,
@@ -98,6 +147,7 @@ function setMode(m: GizmoMode) {
   // stock TransformControls has no combined mode
   if (stock && m !== 'combined') stock.setMode(m)
   for (const [k, el] of Object.entries(modeButtons)) el.classList.toggle('active', k === m)
+  savePrefs({ mode: m })
 }
 for (const m of Object.keys(modeButtons) as GizmoMode[]) modeButtons[m].onclick = () => setMode(m)
 
@@ -106,6 +156,7 @@ spaceBtn.onclick = () => {
   gizmo.setSpace(gizmo.space === 'world' ? 'local' : 'world')
   stock?.setSpace(gizmo.space)
   spaceBtn.textContent = gizmo.space
+  savePrefs({ space: gizmo.space })
 }
 
 const cycleBtn = document.getElementById('cycle')! as HTMLButtonElement
@@ -114,21 +165,25 @@ cycleBtn.onclick = () => {
   if (stock) stock.attach(objects[current]!)
   else gizmo.attach(objects[current]!)
   cycleBtn.textContent = objectNames[current]!
+  savePrefs({ object: current })
 }
 
 const snapBox = document.getElementById('snap') as HTMLInputElement
-snapBox.onchange = () => {
+function applySnap() {
   for (const g of [gizmo, stock]) {
     g?.setTranslationSnap(snapBox.checked ? 1 : null)
     g?.setRotationSnap(snapBox.checked ? (15 * Math.PI) / 180 : null)
     g?.setScaleSnap(snapBox.checked ? 0.25 : null)
   }
+  savePrefs({ snap: snapBox.checked })
 }
+snapBox.onchange = applySnap
 
 for (const a of ['X', 'Y', 'Z'] as const) {
   const box = document.getElementById(`show${a}`) as HTMLInputElement
   box.onchange = () => {
     gizmo[`show${a}`] = box.checked
+    savePrefs({ [`show${a}`]: box.checked })
   }
 }
 
@@ -178,6 +233,13 @@ function applyTheme() {
           ...labelFlags,
         },
   )
+  savePrefs({
+    theme: themeBox.checked,
+    degrees: degreesBox.checked,
+    scalePct: scalePctBox.checked,
+    scaleMods: scaleModsBox.checked,
+    originDist: originDistBox.checked,
+  })
 }
 themeBox.onchange = applyTheme
 degreesBox.onchange = applyTheme
@@ -193,7 +255,8 @@ function stockHelper(controls: object): Object3D {
   return c.getHelper ? c.getHelper() : (controls as Object3D)
 }
 let stock: import('three/examples/jsm/controls/TransformControls.js').TransformControls | null = null
-compareBox.onchange = async () => {
+async function applyCompare() {
+  savePrefs({ compare: compareBox.checked })
   if (compareBox.checked) {
     const { TransformControls } = await import('three/examples/jsm/controls/TransformControls.js')
     stock = new TransformControls(camera, renderer.domElement)
@@ -219,6 +282,37 @@ compareBox.onchange = async () => {
     gizmo.attach(objects[current]!)
   }
 }
+compareBox.onchange = () => {
+  void applyCompare()
+}
+
+// restore persisted UI state
+snapBox.checked = prefs.snap
+themeBox.checked = prefs.theme
+degreesBox.checked = prefs.degrees
+scalePctBox.checked = prefs.scalePct
+scaleModsBox.checked = prefs.scaleMods
+originDistBox.checked = prefs.originDist
+compareBox.checked = prefs.compare
+for (const a of ['X', 'Y', 'Z'] as const) {
+  const box = document.getElementById(`show${a}`) as HTMLInputElement
+  box.checked = prefs[`show${a}`]
+  gizmo[`show${a}`] = box.checked
+}
+if (prefs.object >= 0 && prefs.object < objects.length) {
+  current = prefs.object
+  gizmo.attach(objects[current]!)
+  cycleBtn.textContent = objectNames[current]!
+}
+if (prefs.space === 'local' || prefs.space === 'world') {
+  gizmo.setSpace(prefs.space)
+  spaceBtn.textContent = prefs.space
+}
+const modes: GizmoMode[] = ['translate', 'rotate', 'scale', 'combined']
+setMode(modes.includes(prefs.mode) ? prefs.mode : 'translate')
+applySnap()
+applyTheme()
+if (prefs.compare) void applyCompare()
 
 window.addEventListener('keydown', (e) => {
   if (e.key === 't') setMode('translate')

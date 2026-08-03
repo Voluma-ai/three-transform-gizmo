@@ -11,7 +11,7 @@ import {
   Vector3,
 } from 'three'
 import { getDragPlane, intersectPlane } from './core/DragPlane'
-import { computeAnchoredScale } from './core/ExtrudeMath'
+import { computeAnchoredScale, effectiveScaleRatio } from './core/ExtrudeMath'
 import { screenScaleFactor } from './core/ScreenScale'
 import { snapAngle } from './core/Snapping'
 import { AngleSector } from './gizmos/AngleSector'
@@ -808,10 +808,12 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
     object.scale.copy(scale)
     object.position.copy(position)
 
-    // relative ratio for the % readout (mean over axes that actually changed)
-    const sx = drag.scaleStart.x !== 0 ? scale.x / drag.scaleStart.x : 1
-    const sy = drag.scaleStart.y !== 0 ? scale.y / drag.scaleStart.y : 1
-    const sz = drag.scaleStart.z !== 0 ? scale.z / drag.scaleStart.z : 1
+    // Drag-relative ratio for % readout / yellow-axis stretch. Uses the same
+    // sensitivity floor as ExtrudeMath so near-zero starts do not explode UI.
+    const fallbackSign = drag.axis.startsWith('-') ? -1 : 1
+    const sx = effectiveScaleRatio(drag.scaleStart.x, scale.x, fallbackSign)
+    const sy = effectiveScaleRatio(drag.scaleStart.y, scale.y, fallbackSign)
+    const sz = effectiveScaleRatio(drag.scaleStart.z, scale.z, fallbackSign)
     if (this._shiftKey || drag.axis === 'XYZ') {
       drag.scaleRatio = (sx + sy + sz) / 3
     } else {

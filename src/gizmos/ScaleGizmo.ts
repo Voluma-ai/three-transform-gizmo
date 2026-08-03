@@ -31,6 +31,9 @@ const PLANES: { pair: string; rot: Euler; dir: Vector3 }[] = [
   { pair: 'YZ', rot: new Euler(0, Math.PI / 2, 0), dir: new Vector3(0, 1, 1) },
 ]
 
+/** How much yellow axis visuals track object scale: visual = 1 + blend*(r-1). */
+const VISUAL_SCALE_BLEND = 0.8
+
 interface AxisEnd {
   axis: AxisId
   letter: 'X' | 'Y' | 'Z'
@@ -213,7 +216,7 @@ export class ScaleGizmo extends ModeGizmo {
 
     const labelOpts = {
       color: this.labelColor,
-      size: t.sizes.modifierLabelSize,
+      size: t.sizes.modifierLabelSize * 0.75,
       renderOrder: t.renderOrder + 2,
     }
     for (const letter of ['X', 'Y', 'Z'] as const) {
@@ -267,16 +270,22 @@ export class ScaleGizmo extends ModeGizmo {
     const combined = this.layout === 'combined'
     const d = this.axisRadius()
 
-    this.layoutAxisEnds(d)
+    const highlight = dragAxis ? theme.colors.active : theme.colors.hover
+    const opacity = dragAxis ? theme.opacity.active : theme.opacity.hover
+    const showHalves = guiding ? this.halvesToShow(active!, mods) : null
+
+    // Yellow halves track object scale at half intensity while dragging.
+    const ratio = mods.scaleRatio
+    const stretch =
+      dragAxis !== null && ratio != null && Number.isFinite(ratio) ? 1 + VISUAL_SCALE_BLEND * (ratio - 1) : 1
+    const dStretched = d * stretch
+
+    this.layoutAxisEnds(d, showHalves, stretch)
 
     // solid shafts: idle dedicated-scale look only
     for (const shaft of this.shafts) {
       if (combined || guiding) shaft.visible = false
     }
-
-    const highlight = dragAxis ? theme.colors.active : theme.colors.hover
-    const opacity = dragAxis ? theme.opacity.active : theme.opacity.hover
-    const showHalves = guiding ? this.halvesToShow(active!, mods) : null
 
     for (const end of this.axisEnds) {
       const on = showHalves !== null && showHalves.has(end.axis) && ModeGizmo.axisShown(end.axis, show)
@@ -287,17 +296,22 @@ export class ScaleGizmo extends ModeGizmo {
       }
     }
 
-    this.updateModifierLabels(active, guiding, d, show, mods)
-    this.updateScalePercent(dragAxis, mods.scaleRatio ?? null, d)
+    this.updateModifierLabels(active, guiding, d, dStretched, show, mods)
+    this.updateScalePercent(dragAxis, mods.scaleRatio ?? null, dStretched)
   }
 
-  private layoutAxisEnds(d: number): void {
+  /**
+   * Place cubes / pickers / dashed-guide tips. Highlighted halves use `d * stretch`
+   * so the yellow axis gives scale feedback without matching the object 1:1.
+   */
+  private layoutAxisEnds(d: number, stretchedHalves: Set<AxisId> | null, stretch: number): void {
     // Shafts stay at the inward idle length; cubes / pickers / dashed guides
     // share the mode radius (inward in dedicated scale, outer in combined).
-    const halfSpan = d - this.cubeSize / 2
     for (const end of this.axisEnds) {
       const { dir, sign } = end
-      end.cube.position.copy(dir).multiplyScalar(d * sign)
+      const rd = stretchedHalves?.has(end.axis) ? d * stretch : d
+      const halfSpan = rd - this.cubeSize / 2
+      end.cube.position.copy(dir).multiplyScalar(rd * sign)
       end.picker.position.copy(end.cube.position)
       end.core.position.copy(end.cube.position)
 
@@ -324,6 +338,7 @@ export class ScaleGizmo extends ModeGizmo {
     active: AxisId | null,
     guiding: boolean,
     d: number,
+    dStretched: number,
     showAxes: { x: boolean; y: boolean; z: boolean },
     mods: ScaleVisualMods,
   ): void {
@@ -335,7 +350,10 @@ export class ScaleGizmo extends ModeGizmo {
     const core = active.replace(/^[+-]/, '')
     const sign = active.startsWith('-') ? -1 : 1
     const activeLetters = new Set(core.split('') as ('X' | 'Y' | 'Z')[])
-    const r = d * 0.72
+    // Shift hints sit on idle axes (base radius). Alt hints on the opposite
+    // half: stretch with the yellow axis only when Alt lights that half too.
+    const shiftR = d * 0.72
+    const altR = (mods.alt ? dStretched : d) * 0.72
     const shiftColor = mods.shift ? this.labelColor : this.modifierIdleColor
     const altColor = mods.alt ? this.labelColor : this.modifierIdleColor
 
@@ -345,7 +363,7 @@ export class ScaleGizmo extends ModeGizmo {
       if (!ModeGizmo.axisShown(`+${letter}` as AxisId, showAxes)) continue
       label.visible = true
       label.setColor(shiftColor)
-      label.position.copy(ScaleGizmo.letterDir(letter)).multiplyScalar(r)
+      label.position.copy(ScaleGizmo.letterDir(letter)).multiplyScalar(shiftR)
     }
 
     for (const { letter, label } of this.altLabels) {
@@ -355,7 +373,7 @@ export class ScaleGizmo extends ModeGizmo {
       label.visible = true
       label.setColor(altColor)
       // opposite side of the grabbed handle
-      label.position.copy(ScaleGizmo.letterDir(letter)).multiplyScalar(-sign * r)
+      label.position.copy(ScaleGizmo.letterDir(letter)).multiplyScalar(-sign * altR)
     }
   }
 

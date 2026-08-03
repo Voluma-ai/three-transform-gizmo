@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { Matrix4, Quaternion, Vector3 } from 'three'
-import { computeAnchoredScale, parseScaleHandle, type AnchoredScaleInput } from '../src/core/ExtrudeMath'
+import {
+  computeAnchoredScale,
+  effectiveScaleRatio,
+  parseScaleHandle,
+  type AnchoredScaleInput,
+} from '../src/core/ExtrudeMath'
 import type { AxisId } from '../src/types'
 
 function baseInput(overrides: Partial<AnchoredScaleInput> = {}): AnchoredScaleInput {
@@ -238,15 +243,76 @@ describe('computeAnchoredScale', () => {
     expect(Math.abs(scale.x)).toBeCloseTo(1.5)
   })
 
-  it('zero start scale does not produce NaN', () => {
+  it('zero start scale grows via sensitivity floor', () => {
     const input = baseInput({
       scaleStart: new Vector3(0, 1, 1),
       worldScaleStart: new Vector3(0, 1, 1),
       offsetWorld: new Vector3(0.5, 0, 0),
+      centerAnchored: true,
     })
     const { scale, position } = computeAnchoredScale(input)
     expect(Number.isFinite(scale.x)).toBe(true)
     expect(Number.isFinite(position.x)).toBe(true)
+    // ratio 1.5 with MIN=0.1 → 0 + 0.1*0.5 = 0.05
+    expect(scale.x).toBeCloseTo(0.05)
+  })
+
+  it('near-zero start recovers to a usable scale with a modest drag', () => {
+    const input = baseInput({
+      scaleStart: new Vector3(1e-6, 1, 1),
+      worldScaleStart: new Vector3(1e-6, 1, 1),
+      offsetWorld: new Vector3(0.5, 0, 0),
+      centerAnchored: true,
+    })
+    const { scale } = computeAnchoredScale(input)
+    expect(scale.x).toBeGreaterThan(0.05)
+    expect(scale.x).toBeCloseTo(0.05, 3)
+  })
+
+  it('near-zero start still extrudes (opposite face fixed), not center-anchored', () => {
+    const scaleStart = new Vector3(1e-6, 1, 1)
+    const input = baseInput({
+      scaleStart,
+      worldScaleStart: scaleStart.clone(),
+      offsetWorld: new Vector3(0.5, 0, 0),
+      centerAnchored: false,
+    })
+    const { scale, position } = computeAnchoredScale(input)
+    expect(scale.x).toBeCloseTo(0.05, 3)
+    // opposite (-X) face stays put — origin must shift, unlike Alt/center
+    expect(Math.abs(position.x)).toBeGreaterThan(0.01)
+    const before = localToWorld(new Vector3(-0.5, 0, 0), input.positionStart, new Quaternion(), scaleStart)
+    const after = localToWorld(new Vector3(-0.5, 0, 0), position, new Quaternion(), scale)
+    expect(after.distanceTo(before)).toBeLessThan(1e-6)
+  })
+
+  it('normal start scale still matches multiplicative ratio', () => {
+    const input = baseInput({
+      offsetWorld: new Vector3(0.5, 0, 0),
+      centerAnchored: true,
+    })
+    const { scale } = computeAnchoredScale(input)
+    expect(scale.x).toBeCloseTo(1.5)
+  })
+
+  it('effectiveScaleRatio stays bounded for near-zero starts', () => {
+    // 1e-6 → ~0.05 would be a 50_000× multiplicative ratio; UI must use ~1.5
+    expect(effectiveScaleRatio(1e-6, 0.05)).toBeCloseTo(1.5, 2)
+    expect(effectiveScaleRatio(1, 1.5)).toBeCloseTo(1.5)
+    expect(effectiveScaleRatio(0, 0.05)).toBeCloseTo(1.5, 2)
+  })
+
+  it('uniform XYZ near-zero start recovers via sensitivity floor', () => {
+    const input = baseInput({
+      handle: 'XYZ' as AxisId,
+      scaleStart: new Vector3(1e-6, 1e-6, 1e-6),
+      worldScaleStart: new Vector3(1e-6, 1e-6, 1e-6),
+      offsetWorld: new Vector3(0.5, 0, 0),
+    })
+    const { scale } = computeAnchoredScale(input)
+    expect(scale.x).toBeGreaterThan(0.05)
+    expect(scale.y).toBeCloseTo(scale.x)
+    expect(scale.z).toBeCloseTo(scale.x)
   })
 
   it('uniform XYZ scales all axes, center anchored', () => {

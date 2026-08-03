@@ -26,6 +26,10 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   plane quads are smaller and closer (`planeSize` / `planeOffset`).
 - Sticky rotate hover yields when the pointer is over a translate arrow or scale
   cube _core_ (the drawn shape); the larger picker overhang still keeps rotate.
+- While scale-dragging, yellow (highlighted) axis cubes/guides stretch at half
+  the object's scale intensity (`1 + 0.5*(r-1)`).
+- Near-zero scale starts use a sensitivity floor (0.1) so a later drag can grow
+  the object again without needing absurd multiplicative ratios.
 
 ## [0.6.0] - 2026-08-03
 

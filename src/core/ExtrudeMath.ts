@@ -48,6 +48,38 @@ const AXIS_VECS: Record<AxisKey, Vector3> = {
   z: new Vector3(0, 0, 1),
 }
 
+/**
+ * Floors drag sensitivity so a near-zero start scale can grow again.
+ * When `|scaleStart| >= MIN`, this is identical to `scaleStart * ratio`.
+ */
+export const MIN_SCALE_SENSITIVITY = 0.1
+
+function scaleSign(scaleStart: number, fallbackSign: number): number {
+  return Math.abs(scaleStart) >= 1e-15 ? Math.sign(scaleStart) : fallbackSign !== 0 ? Math.sign(fallbackSign) : 1
+}
+
+/**
+ * Apply a handle-distance ratio to a start scale component.
+ * `fallbackSign` is used when `scaleStart` is ~0 (e.g. the grabbed handle sign).
+ */
+function applyScaleRatio(scaleStart: number, ratio: number, fallbackSign: number): number {
+  const delta = ratio - 1
+  const sgn = scaleSign(scaleStart, fallbackSign)
+  const sensitivity = Math.max(Math.abs(scaleStart), MIN_SCALE_SENSITIVITY)
+  return scaleStart + sgn * sensitivity * delta
+}
+
+/**
+ * Drag-relative scale factor for UI (% label, yellow-axis stretch).
+ * Matches multiplicative `next/start` for normal magnitudes; near zero uses the
+ * sensitivity floor so the readout does not explode (e.g. 1e-6 → 0.05).
+ */
+export function effectiveScaleRatio(scaleStart: number, scaleNext: number, fallbackSign = 1): number {
+  const sgn = scaleSign(scaleStart, fallbackSign)
+  const sensitivity = Math.max(Math.abs(scaleStart), MIN_SCALE_SENSITIVITY)
+  return 1 + (scaleNext - scaleStart) / (sgn * sensitivity)
+}
+
 /** Parse a scale handle id into its axes and grab signs. */
 export function parseScaleHandle(handle: AxisId): { axes: AxisKey[]; sign: number } {
   if (handle === 'XYZ') return { axes: ['x', 'y', 'z'], sign: 0 }
@@ -72,19 +104,23 @@ const _tmp = new Vector3()
  * When proportional, that ratio is applied to all three axes rather than only
  * the dragged ones, and the caller typically also sets centerAnchored so growth
  * stays about the origin.
+ *
+ * Near-zero start scales use a sensitivity floor ({@link MIN_SCALE_SENSITIVITY})
+ * so a later drag can grow the object again without needing absurd ratios.
  */
 export function computeAnchoredScale(input: AnchoredScaleInput): AnchoredScaleResult {
   const { axes, sign } = parseScaleHandle(input.handle)
   const scale = input.scaleStart.clone()
   const position = input.positionStart.clone()
   _shift.set(0, 0, 0)
+  const fallbackSign = sign !== 0 ? sign : 1
 
   if (input.handle === 'XYZ') {
     // uniform, always center-anchored; ratio from drag along camera-right is
     // computed by the caller and passed via offsetWorld.x (see TransformGizmo)
     const s = Math.max(1e-4, 1 + input.offsetWorld.x / Math.max(Math.abs(input.handleDistanceWorld), 1e-6))
     for (const a of ['x', 'y', 'z'] as AxisKey[]) {
-      scale[a] = snapScale(input.scaleStart[a] * s, input.scaleSnap)
+      scale[a] = snapScale(applyScaleRatio(input.scaleStart[a], s, 1), input.scaleSnap)
     }
     return { scale, position }
   }
@@ -108,34 +144,40 @@ export function computeAnchoredScale(input: AnchoredScaleInput): AnchoredScaleRe
     // every axis. Snapping each resulting component independently would distort
     // an object whose starting scale is non-uniform.
     const referenceScale = axes.reduce((sum, a) => sum + Math.abs(input.scaleStart[a]), 0) / axes.length
-    if (referenceScale >= 1e-10) {
-      const snappedReferenceScale = Math.abs(snapScale(referenceScale * proportionalRatio, input.scaleSnap))
-      proportionalRatio = snappedReferenceScale / referenceScale
-    }
+    const sensitivity = Math.max(referenceScale, MIN_SCALE_SENSITIVITY)
+    const unsapped = applyScaleRatio(referenceScale, proportionalRatio, 1)
+    const snappedReferenceScale = Math.abs(snapScale(unsapped, input.scaleSnap))
+    // Invert applyScaleRatio for a positive reference: ref + sens*(r-1) = snapped
+    proportionalRatio = 1 + (snappedReferenceScale - referenceScale) / sensitivity
   }
 
   const draggedAxes = new Set(axes)
   const scaledAxes: AxisKey[] = input.proportional ? ['x', 'y', 'z'] : axes
 
   for (const a of scaledAxes) {
-    const startAxisScale = Math.abs(input.scaleStart[a]) < 1e-10 ? 1e-10 : input.scaleStart[a]
+    const startAxisScale = input.scaleStart[a]
+    const ratio = input.proportional ? proportionalRatio : rawRatio(a)
     const newAxisScale = input.proportional
-      ? input.scaleStart[a] * proportionalRatio
-      : snapScale(startAxisScale * rawRatio(a), input.scaleSnap)
-    const effectiveRatio = input.proportional ? proportionalRatio : newAxisScale / startAxisScale
+      ? applyScaleRatio(startAxisScale, ratio, fallbackSign)
+      : snapScale(applyScaleRatio(startAxisScale, ratio, fallbackSign), input.scaleSnap)
     scale[a] = newAxisScale
 
     // Only a dragged axis has a face to pin.
     if (!input.centerAnchored && draggedAxes.has(a)) {
       // Keep the opposite face fixed: the anchor sits at
       // (center - sign*e) along the axis in local units. When the axis scale
-      // grows by ratio r, every local point p maps to world offset that grows
-      // linearly, so pinning the anchor moves the origin in world by
-      // u * worldScale_axis * (r-1) * (e - sign*c)  where e = half extent,
-      // c = local bbox center offset along the axis (signed toward +axis).
+      // grows by Δs, pinning the anchor moves the origin in world by
+      // u * worldDelta * (e - sign*c). Use local Δs mapped through world/start
+      // (not worldStart*(r-1) with a sensitivity-floored r) so near-zero starts
+      // still extrude instead of looking center-anchored.
       const e = input.localHalfExtents[a]
       const c = input.localCenterOffset[a] * sign
-      const shiftLen = input.worldScaleStart[a] * (effectiveRatio - 1) * (e - c)
+      const localDelta = newAxisScale - startAxisScale
+      const worldDelta =
+        Math.abs(startAxisScale) >= 1e-10
+          ? (input.worldScaleStart[a] * localDelta) / startAxisScale
+          : localDelta / (Math.abs(input.parentScaleInv[a]) > 1e-15 ? input.parentScaleInv[a] : 1)
+      const shiftLen = worldDelta * (e - c)
       _shift.addScaledVector(axisDir(a), shiftLen)
     }
   }
