@@ -172,6 +172,23 @@ describe('translate', () => {
     expect(cube.position.x % 1).toBeCloseTo(0)
   })
 
+  it('snaps to integer world coordinates while Shift is held', () => {
+    cube.position.set(0.37, 0, 0)
+    scene.updateMatrixWorld(true)
+    drag(handlePoint(X, 0.6), 80, 0, { shiftKey: true })
+    const world = cube.getWorldPosition(new Vector3())
+    expect(world.x % 1).toBeCloseTo(0)
+  })
+
+  it('snaps the drag offset with Alt, not absolute world position', () => {
+    cube.position.set(0.37, 0, 0)
+    scene.updateMatrixWorld(true)
+    drag(handlePoint(X, 0.6), 80, 0, { altKey: true })
+    // relative to start: 0.37 + n*snap — not an absolute world integer
+    expect((cube.position.x - 0.37) % 1).toBeCloseTo(0)
+    expect(cube.position.x % 1).toBeCloseTo(0.37)
+  })
+
   it('respects a translated parent when snapping in world space', () => {
     const parent = new Group()
     parent.position.set(0.5, 0, 0)
@@ -235,7 +252,7 @@ describe('rotate', () => {
 
 describe('scale (extrude)', () => {
   function scaleDist(): number {
-    return gizmo.getTheme().sizes.scaleHandleDistance
+    return gizmo.getTheme().sizes.scaleHandleDistanceNonUniform
   }
 
   it('anchors the opposite face when dragging a +X handle', () => {
@@ -252,6 +269,18 @@ describe('scale (extrude)', () => {
     gizmo.setMode('scale')
     drag(handlePoint(X, scaleDist()), 60, 0, { altKey: true })
     expect(cube.scale.x).toBeGreaterThan(1.05)
+    expect(cube.position.length()).toBeCloseTo(0)
+  })
+
+  it('keeps the origin fixed when dragging a plane scale handle', () => {
+    gizmo.setMode('scale')
+    gizmo.updateMatrixWorld(true)
+    const scale = gizmo.children.find((c): c is ModeGizmo => c instanceof ModeGizmo && c.mode === 'scale')!
+    const picker = scale.getPickers().find((p) => p.userData.handle.axis === '+XY')!
+    const pt = toScreen(picker.getWorldPosition(new Vector3()))
+    drag(pt, 80, -50)
+    // Plane scale is always center-anchored — position must not drift even as X/Y change.
+    expect(cube.scale.x !== 1 || cube.scale.y !== 1).toBe(true)
     expect(cube.position.length()).toBeCloseTo(0)
   })
 
@@ -326,13 +355,11 @@ describe('scale (extrude)', () => {
     expect(cube.scale.z).toBeCloseTo(cube.scale.x)
   })
 
-  it('still anchors the opposite face when Shift is held', () => {
+  it('keeps the origin fixed when Shift is held', () => {
     gizmo.setMode('scale')
-    const anchorBefore = new Vector3(-0.5, 0, 0).applyMatrix4(cube.matrixWorld)
     drag(handlePoint(X, scaleDist()), 60, 0, { shiftKey: true })
-    cube.updateWorldMatrix(true, false)
-    const anchorAfter = new Vector3(-0.5, 0, 0).applyMatrix4(cube.matrixWorld)
-    expect(anchorAfter.distanceTo(anchorBefore)).toBeLessThan(1e-6)
+    expect(cube.scale.x).toBeGreaterThan(1.05)
+    expect(cube.position.length()).toBeCloseTo(0)
   })
 
   it('combines Shift and Alt: proportional growth about the origin', () => {
@@ -400,7 +427,7 @@ describe('drag lifecycle safety', () => {
     gizmo.setMode('scale')
     const pos = cube.position.clone()
     const scl = cube.scale.clone()
-    const pt = handlePoint(X, gizmo.getTheme().sizes.scaleHandleDistance)
+    const pt = handlePoint(X, gizmo.getTheme().sizes.scaleHandleDistanceNonUniform)
     down(pt)
     move({ x: pt.x + 50, y: pt.y })
     expect(cube.scale.x).not.toBeCloseTo(scl.x)
@@ -703,10 +730,99 @@ describe('combined mode', () => {
     expect(lines.filter((l) => l.visible).length).toBe(1)
   })
 
-  it('keeps translate arrows inside the rotate ring and scale cubes outside', () => {
-    const { arrowLength, ringRadius, scaleHandleDistance, scaleCubeSize } = gizmo.getTheme().sizes
+  it('shows Shift on idle axes and Alt on the opposite half', () => {
+    gizmo.setMode('scale')
+    gizmo.setTheme({ showScaleModifiers: true })
+    gizmo.updateMatrixWorld(true)
+    const scale = modeChildren().find((c) => c.mode === 'scale')!
+    const theme = gizmo.getTheme()
+    const show = { x: true, y: true, z: true }
+    const sprites = scale.visual.children.filter((o) => o.type === 'Sprite')
+
+    scale.updateVisuals(null, null, theme, show)
+    expect(sprites.filter((s) => s.visible).length).toBe(0)
+
+    // +X: Shift on Y and Z, Alt on -X
+    scale.updateVisuals('+X', null, theme, show, { alt: false, shift: false })
+    const visible = sprites.filter((s) => s.visible)
+    expect(visible.length).toBe(3)
+    const positions = visible.map((s) => s.position.clone())
+    expect(positions.some((p) => p.y > 0.3 && Math.abs(p.x) < 0.1 && Math.abs(p.z) < 0.1)).toBe(true)
+    expect(positions.some((p) => p.z > 0.3 && Math.abs(p.x) < 0.1 && Math.abs(p.y) < 0.1)).toBe(true)
+    expect(positions.some((p) => p.x < -0.3 && Math.abs(p.y) < 0.1 && Math.abs(p.z) < 0.1)).toBe(true)
+
+    // +XY: Shift on Z, Alt on -X and -Y
+    scale.updateVisuals('+XY', null, theme, show, { alt: false, shift: false })
+    expect(sprites.filter((s) => s.visible).length).toBe(3)
+
+    scale.updateVisuals('XYZ', null, theme, show, { alt: false, shift: false })
+    expect(sprites.filter((s) => s.visible).length).toBe(0)
+
+    gizmo.setTheme({ showScaleModifiers: false })
+    const scaleOff = modeChildren().find((c) => c.mode === 'scale')!
+    scaleOff.updateVisuals('+X', null, gizmo.getTheme(), show, { alt: false, shift: false })
+    const spritesOff = scaleOff.visual.children.filter((o) => o.type === 'Sprite')
+    expect(spritesOff.filter((s) => s.visible).length).toBe(0)
+  })
+
+  it('shows an origin trail while translating or extrude-scaling', () => {
+    const origin = gizmo.children.find((c) => {
+      if ('mode' in c) return false
+      const lines = c.children.filter((ch) => ch.type === 'Line')
+      const meshes = c.children.filter((ch) => ch.type === 'Mesh')
+      return lines.length >= 1 && meshes.length === 1
+    })
+    expect(origin).toBeTruthy()
+    expect(origin!.visible).toBe(false)
+
+    gizmo.setMode('translate')
+    const pt = handlePoint(X, 0.6)
+    down(pt)
+    move({ x: pt.x + 40, y: pt.y })
+    gizmo.updateMatrixWorld(true)
+    expect(origin!.visible).toBe(true)
+    up({ x: pt.x + 40, y: pt.y })
+    gizmo.updateMatrixWorld(true)
+    expect(origin!.visible).toBe(false)
+
+    // center-anchored scale: ghost circle still shows when origins coincide
+    cube.position.set(0, 0, 0)
+    gizmo.setMode('scale')
+    const spt = handlePoint(X, gizmo.getTheme().sizes.scaleHandleDistanceNonUniform)
+    down(spt, { altKey: true })
+    move({ x: spt.x + 40, y: spt.y }, { altKey: true })
+    gizmo.updateMatrixWorld(true)
+    expect(origin!.visible).toBe(true)
+    up({ x: spt.x + 40, y: spt.y }, { altKey: true })
+  })
+
+  it('keeps translate arrows inside the rotate ring; scale cubes outside', () => {
+    const { arrowLength, ringRadius, scaleHandleDistance, scaleHandleDistanceNonUniform, scaleCubeSize } =
+      gizmo.getTheme().sizes
     expect(arrowLength).toBeLessThan(ringRadius)
+    expect(scaleHandleDistanceNonUniform).toBeGreaterThan(arrowLength)
+    expect(scaleHandleDistanceNonUniform).toBeLessThan(ringRadius)
     expect(scaleHandleDistance - scaleCubeSize / 2).toBeGreaterThan(ringRadius)
+  })
+
+  it('expands translate arrows to the dedicated scale radius only in translate mode', () => {
+    const translate = modeChildren().find(
+      (c) => c.mode === 'translate',
+    ) as import('../src/gizmos/TranslateGizmo').TranslateGizmo
+    const { arrowLength, scaleHandleDistanceNonUniform, arrowHeadLength } = gizmo.getTheme().sizes
+
+    gizmo.setMode('translate')
+    gizmo.updateMatrixWorld(true)
+    expect(translate.expanded).toBe(true)
+    const soloHead = translate
+      .getVisualHandles()
+      .find((h) => h.userData.handle.axis === 'X' && h.geometry.type === 'ConeGeometry')!
+    expect(soloHead.position.length()).toBeCloseTo(scaleHandleDistanceNonUniform - arrowHeadLength / 2)
+
+    gizmo.setMode('combined')
+    gizmo.updateMatrixWorld(true)
+    expect(translate.expanded).toBe(false)
+    expect(soloHead.position.length()).toBeCloseTo(arrowLength - arrowHeadLength / 2)
   })
 
   it('prefers translate over rotate when hovering an arrow near a ring', () => {

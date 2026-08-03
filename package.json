@@ -1,6 +1,6 @@
 {
   "name": "@voluma/three-transform-gizmo",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "description": "Custom three.js transform gizmo with per-axis/per-plane extrude scaling, combined mode, angle-sector rotation and themeable styling. Near drop-in replacement for TransformControls.",
   "keywords": [
     "three",
