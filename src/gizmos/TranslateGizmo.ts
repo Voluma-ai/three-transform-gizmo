@@ -1,6 +1,6 @@
 import { CylinderGeometry, Euler, Vector3 } from 'three'
 import type { GizmoTheme } from '../theme'
-import type { AxisId } from '../types'
+import type { AxisId, GizmoShowFlags } from '../types'
 import { geo, halfOverhangRadius, makeHandle, type HandleMesh } from './HandleFactory'
 import { ModeGizmo } from './ModeGizmo'
 
@@ -81,7 +81,7 @@ export class TranslateGizmo extends ModeGizmo {
         this.visual.add(head)
         heads.push(head)
 
-        const pickPos = dir.clone().multiplyScalar(sign * (L / 2 + 0.1))
+        const pickPos = dir.clone().multiplyScalar(sign * (L / 2 + 0.065))
         const pickR = halfOverhangRadius(t.sizes.arrowHeadRadius, t.sizes.arrowHeadRadius * t.sizes.pickerScale)
         const picker = makeHandle(new CylinderGeometry(pickR, pickR, L, 6), 0, 'translate', axis, t, true)
         picker.rotation.copy(rot)
@@ -130,7 +130,7 @@ export class TranslateGizmo extends ModeGizmo {
     const center = makeHandle(geo.octa(t), t.colors.screen, 'translate', 'XYZ', t)
     center.scale.setScalar(0.6)
     this.visual.add(center)
-    const centerPicker = makeHandle(geo.sphere(t.sizes.scaleCubeSize * 1.2), 0, 'translate', 'XYZ', t, true)
+    const centerPicker = makeHandle(geo.sphere(t.sizes.gripSize * 1.2), 0, 'translate', 'XYZ', t, true)
     this.picker.add(centerPicker)
   }
 
@@ -138,15 +138,15 @@ export class TranslateGizmo extends ModeGizmo {
     hoverAxis: AxisId | null,
     dragAxis: AxisId | null,
     theme: GizmoTheme,
-    show: { x: boolean; y: boolean; z: boolean },
-    _mods?: { alt: boolean; shift: boolean },
+    show: GizmoShowFlags,
+    mods?: { alt?: boolean; shift?: boolean; dimAll?: boolean },
   ): void {
     const L = this.expanded ? this.soloLength : this.combinedLength
     if (L !== this.appliedLength) {
       this.layoutAxes(L)
       this.appliedLength = L
     }
-    super.updateVisuals(hoverAxis, dragAxis, theme, show)
+    super.updateVisuals(hoverAxis, dragAxis, theme, show, mods)
   }
 
   private layoutAxes(L: number): void {
@@ -162,7 +162,7 @@ export class TranslateGizmo extends ModeGizmo {
       for (let i = 0; i < 2; i++) {
         const sign = i === 0 ? 1 : -1
         heads[i]!.position.copy(dir).multiplyScalar(sign * (L - this.headLength / 2))
-        const pickPos = dir.clone().multiplyScalar(sign * (L / 2 + 0.1))
+        const pickPos = dir.clone().multiplyScalar(sign * (L / 2 + 0.065))
         pickers[i]!.position.copy(pickPos)
         pickers[i]!.scale.set(1, pickScaleY, 1)
         cores[i]!.position.copy(pickPos)

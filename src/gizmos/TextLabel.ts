@@ -6,6 +6,7 @@ const FONT = 'bold 56px system-ui, -apple-system, "Segoe UI", sans-serif'
 
 export interface TextLabelOptions {
   color: number
+  /** Label height in gizmo units (scaled with the parent via `setSize`). */
   size: number
   renderOrder: number
 }

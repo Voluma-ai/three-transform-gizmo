@@ -9,7 +9,7 @@ export class AngleLabel extends TextLabel {
   constructor(theme: GizmoTheme) {
     super({
       color: theme.colors.sectorLabel,
-      size: theme.sizes.sectorLabelSize,
+      size: theme.sizes.labelSize * 1.15,
       renderOrder: theme.renderOrder + 1,
     })
   }

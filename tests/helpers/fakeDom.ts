@@ -6,6 +6,11 @@
 export interface FakeElement {
   listeners: Map<string, ((e: unknown) => void)[]>
   captured: Set<number>
+  style: { touchAction: string }
+  ownerDocument?: {
+    addEventListener: FakeElement['addEventListener']
+    removeEventListener: FakeElement['removeEventListener']
+  }
   addEventListener(type: string, fn: (e: unknown) => void): void
   removeEventListener(type: string, fn: (e: unknown) => void): void
   getBoundingClientRect(): { left: number; top: number; width: number; height: number }
@@ -22,9 +27,11 @@ export const HEIGHT = 600
 export function createFakeElement(): FakeElement {
   const listeners = new Map<string, ((e: unknown) => void)[]>()
   const captured = new Set<number>()
-  return {
+  const style = { touchAction: '' }
+  const el: FakeElement = {
     listeners,
     captured,
+    style,
     addEventListener(type, fn) {
       const arr = listeners.get(type) ?? []
       arr.push(fn)
@@ -55,6 +62,11 @@ export function createFakeElement(): FakeElement {
       return n
     },
   }
+  el.ownerDocument = {
+    addEventListener: el.addEventListener.bind(el),
+    removeEventListener: el.removeEventListener.bind(el),
+  }
+  return el
 }
 
 export interface PointerOpts {

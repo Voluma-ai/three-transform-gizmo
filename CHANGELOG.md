@@ -6,6 +6,40 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-08-03
+
+### Added
+
+- TransformControls API parity: `getMode()`, `getHelper()`, `setColors()`,
+  `connect()` / `disconnect()`, `showXY`/`showXZ`/`showYZ`/`showE`/`showXYZE`,
+  `minX`…`maxZ` translation clamps, `viewport` pointer mapping, and
+  `*-changed` events on property assign.
+- Rotate `XYZE` trackball free-rotate (center sphere picker; TransformControls
+  formula). Toggled with `showXYZE`; hidden in `combined` mode.
+
+### Changed
+
+- Overall size is `setSize()` / `.size` only (default `1`). Theme geometry
+  defaults are ~0.65× the previous values so the radial layout still fits after
+  dropping the separate `gizmoSize` multiplier (e.g. `arrowLength` `0.55` →
+  `0.3575`, `scaleHandleDistance` `1.0` → `0.65`).
+- `sizes.scaleHandleDistanceNonUniform` default `0.65` → `0.4225`; dedicated
+  translate arrows match that radius.
+- Rotation degrees use the same size as the scale % (`labelSize × 1.15`).
+- Renamed `sizes.modifierLabelSize` → `sizes.labelSize`; removed
+  `sizes.sectorLabelSize`.
+- Renamed `sizes.scaleCubeSize` → `sizes.gripSize` (scale cubes + translate
+  center octa).
+- Scale shows one plane quad per plane (`+XY`/`+XZ`/`+YZ`), matching
+  `TransformControls` (no opposite-diagonal quads).
+
+### Removed
+
+- `sizes.gizmoSize` — use `setSize()` / `.size` instead (same as
+  `TransformControls`).
+
+## [0.7.0] - 2026-08-03
+
 ### Added
 
 - Origin trail while translating or scaling: gray disc at drag-start plus a
@@ -24,13 +58,18 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Shift + scale also forces center-anchored (in addition to proportional).
 - Translate / scale plane colors match `TransformControls` (perp-axis tint);
   plane quads are smaller and closer (`planeSize` / `planeOffset`).
-- Sticky rotate hover yields when the pointer is over a translate arrow or scale
-  cube _core_ (the drawn shape); the larger picker overhang still keeps rotate.
 - While scale-dragging, yellow (highlighted) axis cubes/guides stretch with the
   object's scale intensity (`1 + 0.8*(r-1)`).
 - Near-zero scale starts use a sensitivity floor (0.1) so a later drag can grow
   the object again without needing absurd multiplicative ratios (extrude still
   pins the opposite face).
+
+## [0.6.1] - 2026-08-03
+
+### Changed
+
+- Sticky rotate hover yields when the pointer is over a translate arrow or scale
+  cube _core_ (the drawn shape); the larger picker overhang still keeps rotate.
 
 ## [0.6.0] - 2026-08-03
 
@@ -150,7 +189,10 @@ Initial release, published to npm as `@voluma/three-transform-gizmo`.
   `latest`.
 - Ships ESM and CJS builds with TypeScript declarations for both.
 
-[Unreleased]: https://github.com/Voluma-ai/three-transform-gizmo/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/Voluma-ai/three-transform-gizmo/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/Voluma-ai/three-transform-gizmo/compare/v0.7.0...v0.8.0
+[0.7.0]: https://github.com/Voluma-ai/three-transform-gizmo/compare/v0.6.1...v0.7.0
+[0.6.1]: https://github.com/Voluma-ai/three-transform-gizmo/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/Voluma-ai/three-transform-gizmo/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/Voluma-ai/three-transform-gizmo/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/Voluma-ai/three-transform-gizmo/compare/v0.3.0...v0.4.0

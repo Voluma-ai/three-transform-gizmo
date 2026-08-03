@@ -1,6 +1,6 @@
 import { Group, Object3D } from 'three'
 import type { GizmoTheme } from '../theme'
-import type { AxisId, GizmoOperation } from '../types'
+import type { AxisId, GizmoOperation, GizmoShowFlags } from '../types'
 import type { HandleMesh } from './HandleFactory'
 
 /** Full tool UI, or the stripped layout used when all three modes share the view. */
@@ -51,22 +51,23 @@ export abstract class ModeGizmo extends Object3D {
 
   /**
    * Per-frame visual state: hover/active tint and fading of inactive handles
-   * while dragging.
+   * while dragging. Pass `dimAll` to fade every handle (e.g. translate/scale
+   * while a rotate drag keeps them visible for context).
    */
   updateVisuals(
     hoverAxis: AxisId | null,
     dragAxis: AxisId | null,
     theme: GizmoTheme,
-    show: { x: boolean; y: boolean; z: boolean },
-    _mods?: { alt: boolean; shift: boolean },
+    show: GizmoShowFlags,
+    _mods?: { alt?: boolean; shift?: boolean; dimAll?: boolean },
   ): void {
     for (const h of this.getVisualHandles()) {
       const { axis, baseColor, baseOpacity } = h.userData.handle
       const visible = ModeGizmo.axisShown(axis, show) && !(this.layout === 'combined' && this.hiddenInCombined(axis))
       h.visible = visible
       if (!visible) continue
-      if (dragAxis) {
-        if (axis === dragAxis) {
+      if (dragAxis || _mods?.dimAll) {
+        if (dragAxis && axis === dragAxis) {
           h.material.color.setHex(theme.colors.active)
           h.material.opacity = theme.opacity.active
         } else {
@@ -84,13 +85,18 @@ export abstract class ModeGizmo extends Object3D {
   }
 
   /** should a handle with this axis be active given the show flags? */
-  static axisShown(axis: AxisId, show: { x: boolean; y: boolean; z: boolean }): boolean {
+  static axisShown(axis: AxisId, show: GizmoShowFlags): boolean {
+    const core = axis.replace(/^[+-]/, '')
+    if (core === 'E') return show.e
+    if (core === 'XYZE') return show.xyze
+    if (core === 'XYZ') return true
+    if (core === 'XY') return show.xy && show.x && show.y
+    if (core === 'XZ') return show.xz && show.x && show.z
+    if (core === 'YZ') return show.yz && show.y && show.z
     return (
-      axis === 'E' ||
-      axis === 'XYZ' ||
-      ((!ModeGizmo.axisUses(axis, 'X') || show.x) &&
-        (!ModeGizmo.axisUses(axis, 'Y') || show.y) &&
-        (!ModeGizmo.axisUses(axis, 'Z') || show.z))
+      (!ModeGizmo.axisUses(axis, 'X') || show.x) &&
+      (!ModeGizmo.axisUses(axis, 'Y') || show.y) &&
+      (!ModeGizmo.axisUses(axis, 'Z') || show.z)
     )
   }
 

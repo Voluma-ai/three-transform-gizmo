@@ -102,6 +102,7 @@ type DemoPrefs = {
   scaleMods: boolean
   originDist: boolean
   compare: boolean
+  size: number
 }
 const defaultPrefs: DemoPrefs = {
   mode: 'translate',
@@ -117,6 +118,7 @@ const defaultPrefs: DemoPrefs = {
   scaleMods: false,
   originDist: false,
   compare: false,
+  size: 1,
 }
 function loadPrefs(): DemoPrefs {
   try {
@@ -124,7 +126,13 @@ function loadPrefs(): DemoPrefs {
     if (!raw) return { ...defaultPrefs }
     const parsed: unknown = JSON.parse(raw)
     if (!parsed || typeof parsed !== 'object') return { ...defaultPrefs }
-    return { ...defaultPrefs, ...(parsed as Partial<DemoPrefs>) }
+    const obj = parsed as Partial<DemoPrefs> & { gizmoSize?: number }
+    const size = typeof obj.size === 'number' ? obj.size : obj.gizmoSize
+    return {
+      ...defaultPrefs,
+      ...obj,
+      size: typeof size === 'number' ? size : defaultPrefs.size,
+    }
   } catch {
     return { ...defaultPrefs }
   }
@@ -132,6 +140,9 @@ function loadPrefs(): DemoPrefs {
 function savePrefs(patch: Partial<DemoPrefs>) {
   const next = { ...loadPrefs(), ...patch }
   localStorage.setItem(PREFS_KEY, JSON.stringify(next))
+}
+function writePrefs(p: DemoPrefs) {
+  localStorage.setItem(PREFS_KEY, JSON.stringify(p))
 }
 const prefs = loadPrefs()
 
@@ -192,6 +203,15 @@ const degreesBox = document.getElementById('degrees') as HTMLInputElement
 const scalePctBox = document.getElementById('scalePct') as HTMLInputElement
 const scaleModsBox = document.getElementById('scaleMods') as HTMLInputElement
 const originDistBox = document.getElementById('originDist') as HTMLInputElement
+const sizeSlider = document.getElementById('size') as HTMLInputElement
+const sizeVal = document.getElementById('sizeVal')!
+function applySize() {
+  const size = Number(sizeSlider.value)
+  sizeVal.textContent = size.toFixed(2)
+  gizmo.setSize(size)
+  stock?.setSize(size)
+  savePrefs({ size })
+}
 function applyTheme() {
   const labelFlags = {
     showSectorLabel: degreesBox.checked,
@@ -212,10 +232,10 @@ function applyTheme() {
             sectorLabel: 0x56ccf2,
           },
           sizes: {
-            scaleCubeSize: 0.09,
-            ringTube: 0.0075,
-            axisLineRadius: 0.004,
-            arrowHeadRadius: 0.05,
+            gripSize: 0.0585,
+            ringTube: 0.004875,
+            axisLineRadius: 0.0026,
+            arrowHeadRadius: 0.0325,
           },
           ...labelFlags,
         }
@@ -229,7 +249,11 @@ function applyTheme() {
             sector: 0xffd60a,
             sectorLabel: 0xffd60a,
           },
-          sizes: { scaleCubeSize: 0.1, ringTube: 0.012, arrowHeadRadius: 0.06 },
+          sizes: {
+            gripSize: 0.065,
+            ringTube: 0.0078,
+            arrowHeadRadius: 0.039,
+          },
           ...labelFlags,
         },
   )
@@ -246,6 +270,7 @@ degreesBox.onchange = applyTheme
 scalePctBox.onchange = applyTheme
 scaleModsBox.onchange = applyTheme
 originDistBox.onchange = applyTheme
+sizeSlider.oninput = applySize
 
 // side-by-side compat check: swap in the stock TransformControls with the
 // exact same call sites (attach/setMode/setSpace/snaps/events)
@@ -267,6 +292,7 @@ async function applyCompare() {
     stock.setTranslationSnap(gizmo.translationSnap)
     stock.setRotationSnap(gizmo.rotationSnap)
     stock.setScaleSnap(gizmo.scaleSnap)
+    stock.setSize(gizmo.size)
     stock.addEventListener('dragging-changed', ((e: { value: boolean }) => {
       orbit.enabled = !e.value
     }) as never)
@@ -286,33 +312,51 @@ compareBox.onchange = () => {
   void applyCompare()
 }
 
-// restore persisted UI state
-snapBox.checked = prefs.snap
-themeBox.checked = prefs.theme
-degreesBox.checked = prefs.degrees
-scalePctBox.checked = prefs.scalePct
-scaleModsBox.checked = prefs.scaleMods
-originDistBox.checked = prefs.originDist
-compareBox.checked = prefs.compare
-for (const a of ['X', 'Y', 'Z'] as const) {
-  const box = document.getElementById(`show${a}`) as HTMLInputElement
-  box.checked = prefs[`show${a}`]
-  gizmo[`show${a}`] = box.checked
-}
-if (prefs.object >= 0 && prefs.object < objects.length) {
-  current = prefs.object
-  gizmo.attach(objects[current]!)
+/** Push a prefs snapshot into the UI + gizmo (does not write localStorage). */
+function applyPrefsToUi(p: DemoPrefs) {
+  snapBox.checked = p.snap
+  themeBox.checked = p.theme
+  degreesBox.checked = p.degrees
+  scalePctBox.checked = p.scalePct
+  scaleModsBox.checked = p.scaleMods
+  originDistBox.checked = p.originDist
+  sizeSlider.value = String(p.size)
+  for (const a of ['X', 'Y', 'Z'] as const) {
+    const box = document.getElementById(`show${a}`) as HTMLInputElement
+    box.checked = p[`show${a}`]
+    gizmo[`show${a}`] = p[`show${a}`]
+  }
+
+  current = p.object >= 0 && p.object < objects.length ? p.object : 0
   cycleBtn.textContent = objectNames[current]!
+  if (!compareBox.checked) gizmo.attach(objects[current]!)
+  else stock?.attach(objects[current]!)
+
+  gizmo.setSpace(p.space)
+  stock?.setSpace(p.space)
+  spaceBtn.textContent = p.space
+
+  setMode(p.mode)
+  applySnap()
+  applyTheme()
+  applySize()
+
+  const wantCompare = p.compare
+  if (compareBox.checked !== wantCompare) {
+    compareBox.checked = wantCompare
+    void applyCompare()
+  }
 }
-if (prefs.space === 'local' || prefs.space === 'world') {
-  gizmo.setSpace(prefs.space)
-  spaceBtn.textContent = prefs.space
+
+document.getElementById('reset')!.onclick = () => {
+  const p = { ...defaultPrefs }
+  writePrefs(p)
+  applyPrefsToUi(p)
+  log('reset to defaults')
 }
-const modes: GizmoMode[] = ['translate', 'rotate', 'scale', 'combined']
-setMode(modes.includes(prefs.mode) ? prefs.mode : 'translate')
-applySnap()
-applyTheme()
-if (prefs.compare) void applyCompare()
+
+// restore persisted UI state
+applyPrefsToUi(prefs)
 
 window.addEventListener('keydown', (e) => {
   if (e.key === 't') setMode('translate')

@@ -47,6 +47,11 @@
       label {
         user-select: none;
       }
+      #ui input[type='range'] {
+        vertical-align: middle;
+        width: 120px;
+        margin: 0 6px;
+      }
     </style>
   </head>
   <body>
@@ -76,6 +81,14 @@
       </div>
       <div>
         <label><input type="checkbox" id="compare" /> compare: use three.js TransformControls</label>
+      </div>
+      <div>
+        <label>
+          size
+          <input type="range" id="size" min="0.2" max="2" step="0.05" value="1" />
+          <span id="sizeVal">1.00</span>
+        </label>
+        &nbsp; <button type="button" id="reset">reset to defaults</button>
       </div>
       <div style="opacity: 0.7">
         Scale: drag end-handles to extrude (opposite side stays put),<br />

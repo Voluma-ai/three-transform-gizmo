@@ -29,8 +29,6 @@ export interface GizmoTheme {
     sector: number
   }
   sizes: {
-    /** overall gizmo scale multiplier (same meaning as TransformControls `size`) */
-    gizmoSize: number
     arrowLength: number
     arrowHeadLength: number
     arrowHeadRadius: number
@@ -41,7 +39,8 @@ export interface GizmoTheme {
     ringRadius: number
     ringTube: number
     screenRingRadius: number
-    scaleCubeSize: number
+    /** Edge length of scale cubes; also sizes the translate center octahedron. */
+    gripSize: number
     /**
      * Radial distance of scale axis cubes while uniform (Shift / XYZ guides).
      * Sits outside the rotate ring.
@@ -56,12 +55,11 @@ export interface GizmoTheme {
     /** scale factor for invisible picker hit areas */
     pickerScale: number
     /**
-     * Relative height of the degrees readout (gizmo units). Only used when
-     * `showSectorLabel` is true.
+     * Relative height of readout labels in gizmo units (before `setSize` /
+     * screen-scale). Scale % and degrees use `× 1.15`; Shift/Alt hints use
+     * `× 0.75`; origin distance uses the base value.
      */
-    sectorLabelSize: number
-    /** Relative height of Shift/Alt key hints and the scale % readout. */
-    modifierLabelSize: number
+    labelSize: number
     /** Radius of the former origin-ghost ring; disc diameter is 55% of this value. */
     originGhostRadius: number
   }
@@ -119,26 +117,24 @@ export const defaultTheme: GizmoTheme = {
     sector: 0.25,
   },
   sizes: {
-    gizmoSize: 1,
-    // radial layout: arrow tip (0.55) → ring (0.75) → scale cube (1.0).
-    // Dedicated scale mode pulls non-uniform cubes inward to 0.65.
+    // radial layout: arrow tip (0.3575) → ring (0.4875) → scale cube (0.65).
+    // Dedicated scale mode pulls non-uniform cubes inward to 0.4225.
     // Dedicated translate mode matches that same inward radius.
-    arrowLength: 0.55,
-    arrowHeadLength: 0.2,
-    arrowHeadRadius: 0.06,
-    axisLineRadius: 0.00625,
-    planeOffset: 0.3,
-    planeSize: 0.154,
-    ringRadius: 0.75,
-    ringTube: 0.012,
-    screenRingRadius: 0.95,
-    scaleCubeSize: 0.1,
-    scaleHandleDistance: 1.0,
-    scaleHandleDistanceNonUniform: 0.65,
+    arrowLength: 0.3575,
+    arrowHeadLength: 0.13,
+    arrowHeadRadius: 0.039,
+    axisLineRadius: 0.0040625,
+    planeOffset: 0.195,
+    planeSize: 0.1001,
+    ringRadius: 0.4875,
+    ringTube: 0.0078,
+    screenRingRadius: 0.6175,
+    gripSize: 0.065,
+    scaleHandleDistance: 0.65,
+    scaleHandleDistanceNonUniform: 0.4225,
     pickerScale: 2.5,
-    sectorLabelSize: 0.16,
-    modifierLabelSize: 0.12,
-    originGhostRadius: 0.06,
+    labelSize: 0.117,
+    originGhostRadius: 0.039,
   },
   snapping: {
     shiftRotationSnapDeg: 15,

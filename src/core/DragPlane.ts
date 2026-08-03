@@ -39,7 +39,7 @@ export function getDragPlane(
   const effSpace: GizmoSpace = mode === 'scale' ? 'local' : space
   const bare = axis.replace(/^[+-]/, '')
 
-  if (axis === 'XYZ' || axis === 'E') {
+  if (axis === 'XYZ' || axis === 'E' || axis === 'XYZE') {
     _n.copy(eye)
   } else if (bare.length === 2) {
     // plane handle: normal is the missing axis

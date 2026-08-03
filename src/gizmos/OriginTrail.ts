@@ -18,7 +18,7 @@ import { TextLabel } from './TextLabel'
 const _start = new Vector3()
 const _q = new Quaternion()
 
-const DASH = 0.05
+const DASH = 0.0325
 /** Gap is 3× dash so the period is color / empty / color / empty with equal lengths. */
 const GAP = DASH * 3
 /** Offset the second color into the third quarter of the period. */
@@ -102,7 +102,7 @@ export class OriginTrail extends Object3D {
 
     this.distanceLabel = new TextLabel({
       color: theme.colors.sectorLabel,
-      size: theme.sizes.modifierLabelSize,
+      size: theme.sizes.labelSize,
       renderOrder: theme.renderOrder + 3,
     })
     this.distanceLabel.visible = false
