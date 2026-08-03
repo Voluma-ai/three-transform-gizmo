@@ -16,7 +16,7 @@ import {
 import { getDragPlane, intersectPlane } from './core/DragPlane'
 import { computeAnchoredScale, effectiveScaleRatio } from './core/ExtrudeMath'
 import { screenScaleFactor } from './core/ScreenScale'
-import { snapAngle } from './core/Snapping'
+import { snapAngle, twistAngleAroundAxis } from './core/Snapping'
 import { AngleSector } from './gizmos/AngleSector'
 import type { HandleMesh } from './gizmos/HandleFactory'
 import { ModeGizmo } from './gizmos/ModeGizmo'
@@ -95,10 +95,10 @@ const UNIT: Record<'X' | 'Y' | 'Z', Vector3> = { X: _unitX, Y: _unitY, Z: _unitZ
 /**
  * Custom transform gizmo — near drop-in replacement for three.js
  * TransformControls, with per-axis "extrude" scaling (handles on both ends of
- * each axis; the opposite side stays anchored, Alt scales from center, Shift
- * constrains proportions and keeps the origin fixed), TransformControls-style
- * plane scale quads (center-anchored), a rotation angle sector with Shift
- * snapping, and themeable styling.
+ * each axis; the opposite side stays anchored, Alt/Option flips the configured
+ * scale anchor, Shift constrains proportions and keeps the origin fixed),
+ * TransformControls-style plane scale quads (center-anchored), space-aware
+ * Ctrl/Command snapping, and themeable styling.
  *
  * Add the instance to your scene (or `scene.add(gizmo.getHelper())`). Dispatches
  * the same event names as TransformControls: change, objectChange,
@@ -144,6 +144,8 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
   private _drag: DragState | null = null
   private _altKey = false
   private _shiftKey = false
+  /** Ctrl or Command — platform-agnostic temporary snap. */
+  private _ctrlKey = false
   private _connected = false
 
   private _translate: TranslateGizmo
@@ -914,6 +916,7 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
     const { mode, axis } = picked
     this._altKey = event.altKey
     this._shiftKey = event.shiftKey
+    this._ctrlKey = event.ctrlKey || event.metaKey
 
     this.updateMatrixWorld(true)
     const object = this.object
@@ -1002,6 +1005,7 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
     if (!this._enabled || !this.object) return
     this._altKey = event.altKey
     this._shiftKey = event.shiftKey
+    this._ctrlKey = event.ctrlKey || event.metaKey
     if (!this._dragging) {
       if (!event.isPrimary) return
       this.updateHover(this.pickHandle(event))
@@ -1026,9 +1030,11 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
     if (!this._enabled || !this.object) return
     const alt = event.altKey
     const shift = event.shiftKey
-    if (alt === this._altKey && shift === this._shiftKey) return
+    const ctrl = event.ctrlKey || event.metaKey
+    if (alt === this._altKey && shift === this._shiftKey && ctrl === this._ctrlKey) return
     this._altKey = alt
     this._shiftKey = shift
+    this._ctrlKey = ctrl
     // refresh dashed scale guides while hovering / dragging without moving
     this.dispatchEvent({ type: 'change' })
   }
@@ -1055,6 +1061,34 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
 
   // ------------------------------------------------------------- drag: modes
 
+  /** Configured snap, else temporary Ctrl/Command default, else continuous. */
+  private activeTranslationSnap(): number | null {
+    if (this._translationSnap) return this._translationSnap
+    if (this._ctrlKey) {
+      const snap = this._theme.snapping.temporaryTranslationSnap
+      return snap || null
+    }
+    return null
+  }
+
+  private activeRotationSnap(): number | null {
+    if (this._rotationSnap) return this._rotationSnap
+    if (this._ctrlKey) {
+      const deg = this._theme.snapping.temporaryRotationSnapDeg
+      return deg ? (deg * Math.PI) / 180 : null
+    }
+    return null
+  }
+
+  private activeScaleSnap(): number | null {
+    if (this._scaleSnap) return this._scaleSnap
+    if (this._ctrlKey) {
+      const snap = this._theme.snapping.temporaryScaleSnap
+      return snap || null
+    }
+    return null
+  }
+
   private applyTranslate(drag: DragState, point: Vector3): void {
     const object = this.object!
     const offset = _v2.copy(point).sub(drag.startPoint)
@@ -1071,66 +1105,36 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
     offset.applyQuaternion(drag.parentQuaternionInv).multiply(drag.parentScaleInv)
     object.position.copy(drag.positionStart).add(offset)
 
-    // Shift: snap resulting WORLD coordinates to integers on the dragged axes.
-    // Alt: snap the drag OFFSET (relative to positionStart) by altTranslationSnap.
-    // Otherwise: optional translationSnap on the resulting absolute position.
-    if (this._shiftKey) {
-      object.updateWorldMatrix(true, false)
-      object.getWorldPosition(_v2)
-      for (const l of ['X', 'Y', 'Z'] as const) {
-        if (drag.axis === 'XYZ' || bare.includes(l)) {
-          const k = l.toLowerCase() as 'x' | 'y' | 'z'
-          _v2[k] = Math.round(_v2[k])
-        }
-      }
-      if (object.parent) object.parent.worldToLocal(_v2)
-      object.position.copy(_v2)
-    } else if (this._altKey) {
-      const snap = this._theme.snapping.altTranslationSnap
-      if (snap) {
-        offset.copy(object.position).sub(drag.positionStart)
-        if (drag.space === 'local') {
-          offset.applyQuaternion(_q1.copy(drag.quaternionStart).invert())
-          for (const l of ['X', 'Y', 'Z'] as const) {
-            if (drag.axis === 'XYZ' || bare.includes(l)) {
-              const k = l.toLowerCase() as 'x' | 'y' | 'z'
-              offset[k] = Math.round(offset[k] / snap) * snap
-            }
-          }
-          offset.applyQuaternion(drag.quaternionStart)
-        } else {
-          for (const l of ['X', 'Y', 'Z'] as const) {
-            if (drag.axis === 'XYZ' || bare.includes(l)) {
-              const k = l.toLowerCase() as 'x' | 'y' | 'z'
-              offset[k] = Math.round(offset[k] / snap) * snap
-            }
-          }
-        }
-        object.position.copy(drag.positionStart).add(offset)
-      }
-    } else if (this.translationSnap) {
-      const snap = this.translationSnap
-      const p = object.position
-      if (drag.space === 'local') {
-        p.applyQuaternion(_q1.copy(drag.quaternionStart).invert())
+    const snap = this.activeTranslationSnap()
+    if (snap) {
+      if (drag.space === 'world') {
+        // Quantize resulting world coordinates on the dragged axes.
+        object.updateWorldMatrix(true, false)
+        object.getWorldPosition(_v2)
         for (const l of ['X', 'Y', 'Z'] as const) {
           if (drag.axis === 'XYZ' || bare.includes(l)) {
             const k = l.toLowerCase() as 'x' | 'y' | 'z'
-            p[k] = Math.round(p[k] / snap) * snap
+            _v2[k] = Math.round(_v2[k] / snap) * snap
           }
         }
-        p.applyQuaternion(drag.quaternionStart)
+        if (object.parent) object.parent.worldToLocal(_v2)
+        object.position.copy(_v2)
       } else {
-        // account for the parent's world translation so snapping is world-grid
-        // aligned (rotated/scaled parents follow TransformControls' approximation)
-        if (object.parent) p.add(_v3.setFromMatrixPosition(object.parent.matrixWorld))
+        // Quantize the drag offset in the drag-start local (object) frame.
+        object.updateWorldMatrix(true, false)
+        object.getWorldPosition(_v2)
+        _v3.copy(_v2).sub(drag.worldPositionStart)
+        _v3.applyQuaternion(_q1.copy(drag.worldQuaternionStart).invert())
         for (const l of ['X', 'Y', 'Z'] as const) {
           if (drag.axis === 'XYZ' || bare.includes(l)) {
             const k = l.toLowerCase() as 'x' | 'y' | 'z'
-            p[k] = Math.round(p[k] / snap) * snap
+            _v3[k] = Math.round(_v3[k] / snap) * snap
           }
         }
-        if (object.parent) p.sub(_v3.setFromMatrixPosition(object.parent.matrixWorld))
+        _v3.applyQuaternion(drag.worldQuaternionStart)
+        _v2.copy(drag.worldPositionStart).add(_v3)
+        if (object.parent) object.parent.worldToLocal(_v2)
+        object.position.copy(_v2)
       }
     }
 
@@ -1141,9 +1145,11 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
 
   private applyRotate(drag: DragState, point: Vector3): void {
     const object = this.object!
+    const snap = this.activeRotationSnap()
 
     if (drag.axis === 'XYZE') {
       // TransformControls trackball: axis = offset × eye, angle from offset · (axis × eye)
+      // Free rotate stays relative in every space (absolute orientation is undefined).
       this._sector.hide()
       const offset = _v2.copy(point).sub(drag.startPoint)
       const camDist = Math.max(drag.worldPositionStart.distanceTo(this.camera.getWorldPosition(_v1)), 1e-6)
@@ -1152,8 +1158,7 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
       if (n.lengthSq() < 1e-12) return
       n.normalize()
       let angle = offset.dot(_v3.copy(n).cross(this._eye)) * speed
-      const shiftSnap = (this._theme.snapping.shiftRotationSnapDeg * Math.PI) / 180
-      angle = snapAngle(angle, this._shiftKey ? shiftSnap : this.rotationSnap)
+      angle = snapAngle(angle, snap)
       _q1.setFromAxisAngle(n, angle)
       object.quaternion
         .copy(drag.parentQuaternionInv)
@@ -1169,8 +1174,19 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
     if (v0.lengthSq() < 1e-12 || v1.lengthSq() < 1e-12) return
     let angle = Math.atan2(v0.clone().cross(v1).dot(n), v0.dot(v1))
 
-    const shiftSnap = (this._theme.snapping.shiftRotationSnapDeg * Math.PI) / 180
-    angle = snapAngle(angle, this._shiftKey ? shiftSnap : this.rotationSnap)
+    // World X/Y/Z: snap absolute twist around the axis (preserves swing).
+    // Local X/Y/Z and screen E: snap the angular delta from drag start.
+    const constrainedAxis = drag.axis === 'X' || drag.axis === 'Y' || drag.axis === 'Z'
+    if (snap && constrainedAxis && drag.space === 'world') {
+      const startTwist = twistAngleAroundAxis(drag.worldQuaternionStart, n)
+      if (startTwist != null) {
+        angle = snapAngle(startTwist + angle, snap) - startTwist
+      } else {
+        angle = snapAngle(angle, snap)
+      }
+    } else {
+      angle = snapAngle(angle, snap)
+    }
 
     // newWorldQ = R * worldQ0  ->  newLocalQ = parentQInv * R * parentQ * localQ0
     _q1.setFromAxisAngle(n, angle)
@@ -1208,9 +1224,9 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
       localHalfExtents: drag.localHalfExtents,
       localCenterOffset: drag.localCenterOffset,
       handleDistanceWorld: drag.handleDistanceWorld,
-      // Alt selects the anchor the gizmo is NOT configured for. Shift (proportional)
-      // always keeps the origin fixed. Uniform XYZ, plane (multi-axis) handles, and
-      // unknown bounds are always centered.
+      // Alt/Option selects the anchor the gizmo is NOT configured for. Shift
+      // (proportional) always keeps the origin fixed. Uniform XYZ, plane
+      // (multi-axis) handles, and unknown bounds are always centered.
       centerAnchored:
         this._shiftKey ||
         (this._scaleAnchor === 'center' ? !this._altKey : this._altKey) ||
@@ -1220,7 +1236,7 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
       // Shift constrains proportions, as in most 2D and 3D editors. The center
       // cube already scales every axis, so the modifier is a no-op there.
       proportional: this._shiftKey,
-      scaleSnap: this.scaleSnap,
+      scaleSnap: this.activeScaleSnap(),
     })
     object.scale.copy(scale)
     object.position.copy(position)

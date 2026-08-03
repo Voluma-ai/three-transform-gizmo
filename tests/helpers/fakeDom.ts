@@ -74,6 +74,8 @@ export interface PointerOpts {
   button?: number
   altKey?: boolean
   shiftKey?: boolean
+  ctrlKey?: boolean
+  metaKey?: boolean
   isPrimary?: boolean
 }
 
@@ -85,6 +87,8 @@ export function pointerEvent(clientX: number, clientY: number, opts: PointerOpts
     button: opts.button ?? 0,
     altKey: opts.altKey ?? false,
     shiftKey: opts.shiftKey ?? false,
+    ctrlKey: opts.ctrlKey ?? false,
+    metaKey: opts.metaKey ?? false,
     isPrimary: opts.isPrimary ?? true,
   }
 }

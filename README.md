@@ -8,10 +8,12 @@ A near drop-in replacement for `TransformControls` with **extrude-style scaling*
 **rotation angle feedback**, and **themeable styling**.
 
 - **Extrude scaling.** Axis cubes pin the opposite face; plane quads and the center
-  cube scale from the origin. Shift = proportional + origin fixed; Alt flips the
-  configured anchor.
-- **Translate snapping.** Alt snaps the drag offset (`altTranslationSnap`); Shift  
-  snaps dragged axes to integer world coordinates.
+  cube scale from the origin. Shift = proportional + origin fixed; Alt/Option flips
+  the configured anchor.
+- **Space-aware snapping.** Ctrl (Windows/Linux) or Command (macOS) temporarily
+  enables snap. World translation/rotation snap to global grids; local snaps relative
+  to the drag-start transform. Configured `*Snap` values take precedence over theme
+  temporary defaults.
 - **Themeable.** Colors, opacities and geometry sizes come from a theme object.
 - **Combined mode.** Translate, rotate and scale in one view.
 
@@ -83,11 +85,16 @@ gizmo.setScaleSnap(0.25)
 | Drag an axis end-cube (scale)          | extrude along that axis — the opposite face stays put                    |
 | Drag a plane quad (scale)              | scale two axes from the center (origin stays fixed)                      |
 | Drag the center cube (scale)           | uniform scale from the center                                            |
-| Alt + scale drag                       | use the anchor `scaleAnchor` is not set to (default: scale from center)  |
-| Alt + translate drag                   | snap the drag offset by `theme.snapping.altTranslationSnap` (default 1)  |
-| Shift + translate drag                 | snap dragged axes to integer world coordinates                           |
+| Ctrl/Cmd + translate / rotate / scale  | temporary snap (theme defaults, or configured `*Snap` if set)            |
 | Shift + scale drag                     | constrain proportions and keep origin fixed (center-anchored)            |
-| Shift + rotate drag                    | snap to `theme.snapping.shiftRotationSnapDeg` (default 15°)              |
+| Alt/Option + scale drag                | use the anchor `scaleAnchor` is not set to (default: scale from center)  |
+
+Snapping is space-aware: world translation and constrained world rotation snap
+resulting transforms to global grids; local translation and rotation snap
+increments relative to the drag-start transform. Screen and trackball rotation
+always snap relatively (absolute orientation is undefined for those handles).
+This intentionally diverges from three.js `TransformControls`, whose
+`rotationSnap` is always incremental.
 
 ## API
 
@@ -171,7 +178,11 @@ const gizmo = new TransformGizmo(camera, renderer.domElement, {
   theme: {
     colors: { x: 0xff6b9d, y: 0xa8e063, z: 0x56ccf2, hover: 0xffffff },
     sizes: { gripSize: 0.0585, ringTube: 0.004875, labelSize: 0.14 },
-    snapping: { shiftRotationSnapDeg: 5 },
+    snapping: {
+      temporaryTranslationSnap: 1,
+      temporaryRotationSnapDeg: 5,
+      temporaryScaleSnap: 0.25,
+    },
     showSectorLabel: true, // opt in to degrees readout while rotating
     showScaleLabel: true, // opt in to relative % while scaling
     showScaleModifiers: true, // opt in to Shift/Alt hints on scale axes
@@ -192,24 +203,24 @@ rather than every frame. The demo has a `size` slider (`npm run dev`).
 
 ## Migrating from `TransformControls`
 
-| `TransformControls` API                                                     | Supported | Notes                                                     |
-| --------------------------------------------------------------------------- | --------- | --------------------------------------------------------- |
-| `attach(object)` / `detach()` / `dispose()`                                 | ✅        |                                                           |
-| `mode` / `setMode()` / `getMode()`                                          | ✅        | also `'combined'`                                         |
-| `space` / `setSpace()`                                                      | ✅        | scale mode always uses local axes (as upstream)           |
-| `setTranslationSnap` / `setRotationSnap` / `setScaleSnap`                   | ✅        | same "snap the resulting transform" semantics             |
-| `size` / `setSize()`, `enabled`, `showX/Y/Z`                                | ✅        | property assign emits `*-changed` + `change`              |
-| `showXY` / `showXZ` / `showYZ` / `showE`                                    | ✅        |                                                           |
-| `showXYZE`                                                                  | ✅        | trackball free-rotate; hidden in `combined` mode          |
-| `minX`/`maxX`/…/`maxZ`                                                      | ✅        | translation clamps                                        |
-| `viewport`                                                                  | ✅        | sub-canvas pointer mapping                                |
-| `setColors(x, y, z, active)`                                                | ✅        | maps into theme colors                                    |
-| `connect()` / `disconnect()`                                                | ✅        |                                                           |
-| `dragging`, `axis` (readonly)                                               | ✅        | scale: `'+X'`/`'-X'`/…, planes `'+XY'`/…, uniform `'XYZ'` |
-| `getRaycaster()`, `reset()`                                                 | ✅        |                                                           |
-| events `change`, `objectChange`, `dragging-changed`, `mouseDown`, `mouseUp` | ✅        | plus `*-changed` property events                          |
-| `getHelper()`                                                               | ✅        | returns `this` — also fine to `scene.add(gizmo)` directly |
-| `setTheme()` / `getTheme()`, `hoveron` / `hoveroff`                         | ➕        | extensions                                                |
+| `TransformControls` API                                                     | Supported | Notes                                                                |
+| --------------------------------------------------------------------------- | --------- | -------------------------------------------------------------------- |
+| `attach(object)` / `detach()` / `dispose()`                                 | ✅        |                                                                      |
+| `mode` / `setMode()` / `getMode()`                                          | ✅        | also `'combined'`                                                    |
+| `space` / `setSpace()`                                                      | ✅        | scale mode always uses local axes (as upstream)                      |
+| `setTranslationSnap` / `setRotationSnap` / `setScaleSnap`                   | ✅        | compatible setters; snap reference follows `space` (see Interaction) |
+| `size` / `setSize()`, `enabled`, `showX/Y/Z`                                | ✅        | property assign emits `*-changed` + `change`                         |
+| `showXY` / `showXZ` / `showYZ` / `showE`                                    | ✅        |                                                                      |
+| `showXYZE`                                                                  | ✅        | trackball free-rotate; hidden in `combined` mode                     |
+| `minX`/`maxX`/…/`maxZ`                                                      | ✅        | translation clamps                                                   |
+| `viewport`                                                                  | ✅        | sub-canvas pointer mapping                                           |
+| `setColors(x, y, z, active)`                                                | ✅        | maps into theme colors                                               |
+| `connect()` / `disconnect()`                                                | ✅        |                                                                      |
+| `dragging`, `axis` (readonly)                                               | ✅        | scale: `'+X'`/`'-X'`/…, planes `'+XY'`/…, uniform `'XYZ'`            |
+| `getRaycaster()`, `reset()`                                                 | ✅        |                                                                      |
+| events `change`, `objectChange`, `dragging-changed`, `mouseDown`, `mouseUp` | ✅        | plus `*-changed` property events                                     |
+| `getHelper()`                                                               | ✅        | returns `this` — also fine to `scene.add(gizmo)` directly            |
+| `setTheme()` / `getTheme()`, `hoveron` / `hoveroff`                         | ➕        | extensions                                                           |
 
 A typical migration is two lines: construct `TransformGizmo` instead of
 `TransformControls`, and `scene.add(gizmo)` or `scene.add(gizmo.getHelper())`.
@@ -221,9 +232,6 @@ stay signed for extrude.
 - **Scale is always local.** Per-axis world-space scaling of a rotated object
   cannot be represented by `Object3D.scale`, so scale handles follow the
   object's local axes — the same choice `TransformControls` makes.
-- **World-space translation snapping with a rotated or scaled parent** snaps in
-  the parent's frame offset by its world translation, matching upstream
-  `TransformControls`. It is exact for unrotated parents.
 - **The extrude anchor needs bounds.** It uses the object's local bounding box.
   Objects with no renderable geometry (splats, empty containers) scale about
   their origin instead — no guessed unit-box shift.
