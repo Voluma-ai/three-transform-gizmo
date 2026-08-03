@@ -7,11 +7,13 @@ import {
   Mesh,
   MeshBasicMaterial,
   PerspectiveCamera,
+  Quaternion,
   Scene,
   Vector3,
   Vector4,
 } from 'three'
 import { ModeGizmo } from '../src/gizmos/ModeGizmo'
+import { twistAngleAroundAxis } from '../src/core/Snapping'
 import { TransformGizmo } from '../src/TransformGizmo'
 import type { AxisId } from '../src/types'
 import { createFakeElement, HEIGHT, pointerEvent, WIDTH, type FakeElement } from './helpers/fakeDom'
@@ -175,30 +177,53 @@ describe('translate', () => {
     expect(cube.position.z).toBeCloseTo(0)
   })
 
-  it('snaps the resulting position to the grid, not the offset', () => {
+  it('snaps world translation to the global grid when translationSnap is set', () => {
     cube.position.set(0.37, 0, 0)
     scene.updateMatrixWorld(true)
     gizmo.setTranslationSnap(1)
     drag(handlePoint(X, arrowTip()), 80, 0)
-    // TransformControls semantics: lands ON the grid, not 0.37 + n
     expect(cube.position.x % 1).toBeCloseTo(0)
   })
 
-  it('snaps to integer world coordinates while Shift is held', () => {
+  it('snaps world translation with Ctrl using the temporary theme default', () => {
     cube.position.set(0.37, 0, 0)
     scene.updateMatrixWorld(true)
-    drag(handlePoint(X, arrowTip()), 80, 0, { shiftKey: true })
+    drag(handlePoint(X, arrowTip()), 80, 0, { ctrlKey: true })
     const world = cube.getWorldPosition(new Vector3())
     expect(world.x % 1).toBeCloseTo(0)
   })
 
-  it('snaps the drag offset with Alt, not absolute world position', () => {
+  it('treats Command (metaKey) like Ctrl for temporary translation snap', () => {
     cube.position.set(0.37, 0, 0)
     scene.updateMatrixWorld(true)
-    drag(handlePoint(X, arrowTip()), 80, 0, { altKey: true })
-    // relative to start: 0.37 + n*snap — not an absolute world integer
+    drag(handlePoint(X, arrowTip()), 80, 0, { metaKey: true })
+    expect(cube.getWorldPosition(new Vector3()).x % 1).toBeCloseTo(0)
+  })
+
+  it('snaps local translation as start + n × interval', () => {
+    cube.position.set(0.37, 0, 0)
+    scene.updateMatrixWorld(true)
+    gizmo.setSpace('local')
+    gizmo.setTranslationSnap(1)
+    drag(handlePoint(X, arrowTip()), 80, 0)
     expect((cube.position.x - 0.37) % 1).toBeCloseTo(0)
     expect(cube.position.x % 1).toBeCloseTo(0.37)
+  })
+
+  it('prefers configured translationSnap over the temporary Ctrl default', () => {
+    cube.position.set(0.37, 0, 0)
+    scene.updateMatrixWorld(true)
+    gizmo.setTranslationSnap(0.5)
+    drag(handlePoint(X, arrowTip()), 80, 0, { ctrlKey: true })
+    expect(cube.position.x % 0.5).toBeCloseTo(0)
+  })
+
+  it('stays continuous without a configured snap or Ctrl', () => {
+    cube.position.set(0.37, 0, 0)
+    scene.updateMatrixWorld(true)
+    drag(handlePoint(X, arrowTip()), 80, 0)
+    expect(cube.position.x).not.toBeCloseTo(Math.round(cube.position.x))
+    expect(cube.position.x).toBeGreaterThan(0.37)
   })
 
   it('respects a translated parent when snapping in world space', () => {
@@ -213,6 +238,21 @@ describe('translate', () => {
     const world = cube.getWorldPosition(new Vector3())
     expect(world.x % 1).toBeCloseTo(0)
   })
+
+  it('snaps local translation through a rotated parent', () => {
+    const parent = new Group()
+    parent.rotation.z = Math.PI / 2
+    scene.add(parent)
+    scene.remove(cube)
+    parent.add(cube)
+    cube.position.set(0.37, 0, 0)
+    scene.updateMatrixWorld(true)
+    gizmo.setSpace('local')
+    gizmo.setTranslationSnap(1)
+    drag(handlePoint(X, arrowTip()), 80, 0)
+    // Offset along the object's local X, quantized, then mapped through parent.
+    expect((cube.position.x - 0.37) % 1).toBeCloseTo(0)
+  })
 })
 
 describe('rotate', () => {
@@ -220,12 +260,60 @@ describe('rotate', () => {
     return handlePoint(Y, gizmo.getTheme().sizes.ringRadius)
   }
 
-  it('rotates the object and snaps with Shift', () => {
+  it('snaps world-axis rotation to absolute twist with Ctrl', () => {
     gizmo.setMode('rotate')
-    drag(ringPoint(), 60, 25, { shiftKey: true })
-    const angle = 2 * Math.acos(Math.min(1, Math.abs(cube.quaternion.w)))
+    // ringPoint() sits on the X ring (YZ plane). Start 2.241° about world X —
+    // nearest 15° grid point is 0°.
+    cube.quaternion.setFromAxisAngle(X, (2.241 * Math.PI) / 180)
+    scene.updateMatrixWorld(true)
+    drag(ringPoint(), 2, 0, { ctrlKey: true })
+    const twist = twistAngleAroundAxis(cube.getWorldQuaternion(new Quaternion()), X)!
+    expect((twist * 180) / Math.PI).toBeCloseTo(0, 4)
+  })
+
+  it('preserves non-dragged swing when snapping world-axis rotation', () => {
+    gizmo.setMode('rotate')
+    // Swing about Y, then a small X twist — snapping X should keep the Y swing.
+    const swing = new Quaternion().setFromAxisAngle(Y, Math.PI / 5)
+    const twist = new Quaternion().setFromAxisAngle(X, (2.241 * Math.PI) / 180)
+    cube.quaternion.copy(twist).multiply(swing)
+    scene.updateMatrixWorld(true)
+    drag(ringPoint(), 2, 0, { ctrlKey: true })
+    const worldQ = cube.getWorldQuaternion(new Quaternion())
+    expect((twistAngleAroundAxis(worldQ, X)! * 180) / Math.PI).toBeCloseTo(0, 4)
+    // After removing the (now-zero) X twist, remaining rotation should still be about Y.
+    const yTwist = twistAngleAroundAxis(worldQ, Y)!
+    expect(Math.abs(yTwist)).toBeGreaterThan(0.3)
+  })
+
+  it('snaps local rotation as an angular delta from drag start', () => {
+    gizmo.setMode('rotate')
+    gizmo.setSpace('local')
+    const startDeg = 2.241
+    cube.quaternion.setFromAxisAngle(X, (startDeg * Math.PI) / 180)
+    scene.updateMatrixWorld(true)
+    gizmo.setRotationSnap((15 * Math.PI) / 180)
+    drag(ringPoint(), 60, 25)
+    const twist = twistAngleAroundAxis(cube.quaternion, X)!
+    const deg = (twist * 180) / Math.PI
+    // Relative: start + n×15, so residual vs start is a multiple of 15.
+    const delta = deg - startDeg
+    expect(delta).toBeCloseTo(Math.round(delta / 15) * 15, 4)
+  })
+
+  it('keeps screen-space rotation relative in world mode', () => {
+    gizmo.setMode('rotate')
+    gizmo.setRotationSnap((15 * Math.PI) / 180)
+    const ePoint = handlePoint(new Vector3(1, 0, 0), gizmo.getTheme().sizes.screenRingRadius)
+    // Start with a small world twist so absolute snap would pull to 0 if misapplied.
+    cube.quaternion.setFromAxisAngle(Y, (2.241 * Math.PI) / 180)
+    const start = cube.quaternion.clone()
+    scene.updateMatrixWorld(true)
+    drag(ePoint, 40, 10)
+    // Relative snap: without enough drag to reach 15°, orientation stays near start
+    // (not snapped to world 0° the way constrained world rings would).
+    const angle = start.angleTo(cube.quaternion)
     const deg = (angle * 180) / Math.PI
-    expect(deg).toBeGreaterThan(0)
     expect(deg).toBeCloseTo(Math.round(deg / 15) * 15, 4)
   })
 
@@ -387,6 +475,37 @@ describe('scale (extrude)', () => {
     expect(cube.scale.x).toBeGreaterThan(1.05)
     expect(cube.scale.z).toBeCloseTo(cube.scale.x)
     expect(cube.position.length()).toBeCloseTo(0)
+  })
+
+  it('snaps resulting scale with Ctrl using the temporary theme default', () => {
+    gizmo.setMode('scale')
+    drag(handlePoint(X, scaleDist()), 60, 0, { ctrlKey: true })
+    const snap = gizmo.getTheme().snapping.temporaryScaleSnap
+    expect(cube.scale.x % snap).toBeCloseTo(0)
+  })
+
+  it('composes Ctrl scale snap with Shift proportional + center anchor', () => {
+    gizmo.setMode('scale')
+    drag(handlePoint(X, scaleDist()), 60, 0, { ctrlKey: true, shiftKey: true })
+    const snap = gizmo.getTheme().snapping.temporaryScaleSnap
+    expect(cube.scale.x % snap).toBeCloseTo(0)
+    expect(cube.scale.y).toBeCloseTo(cube.scale.x)
+    expect(cube.position.length()).toBeCloseTo(0)
+  })
+
+  it('composes Ctrl scale snap with Alt center anchor', () => {
+    gizmo.setMode('scale')
+    drag(handlePoint(X, scaleDist()), 60, 0, { ctrlKey: true, altKey: true })
+    const snap = gizmo.getTheme().snapping.temporaryScaleSnap
+    expect(cube.scale.x % snap).toBeCloseTo(0)
+    expect(cube.position.length()).toBeCloseTo(0)
+  })
+
+  it('prefers configured scaleSnap over the temporary Ctrl default', () => {
+    gizmo.setMode('scale')
+    gizmo.setScaleSnap(0.5)
+    drag(handlePoint(X, scaleDist()), 60, 0, { ctrlKey: true })
+    expect(cube.scale.x % 0.5).toBeCloseTo(0)
   })
 
   it('keeps mirrored objects mirrored', () => {

@@ -6,6 +6,26 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- Space-aware transform snapping: Ctrl (Windows/Linux) / Command (macOS)
+  temporarily enables snap across translate, rotate, and scale. World
+  translation and constrained world rotation snap resulting transforms to
+  global grids; local translation and rotation snap increments relative to the
+  drag-start transform. Screen and trackball rotation stay relative.
+- Theme snap fields renamed: `temporaryTranslationSnap` (default `1`),
+  `temporaryRotationSnapDeg` (default `15`), `temporaryScaleSnap` (default
+  `0.25`). Removed `shiftRotationSnapDeg` and `altTranslationSnap`.
+- Shift and Alt no longer control translate/rotate snapping. Shift still does
+  proportional + center-anchored scale; Alt/Option still flips `scaleAnchor`.
+- Configured `translationSnap` / `rotationSnap` / `scaleSnap` take precedence
+  over temporary Ctrl/Command defaults; without either, transforms stay
+  continuous.
+- World translation snap uses true world coordinates (via `worldToLocal`),
+  including rotated/scaled parents — intentionally beyond TransformControls'
+  parent-translation approximation. Local translation snap is offset-based
+  (`start + n × interval`).
+
 ## [0.8.0] - 2026-08-03
 
 ### Added

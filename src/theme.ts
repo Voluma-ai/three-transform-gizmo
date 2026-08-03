@@ -64,10 +64,21 @@ export interface GizmoTheme {
     originGhostRadius: number
   }
   snapping: {
-    /** rotation snap in degrees applied while Shift is held */
-    shiftRotationSnapDeg: number
-    /** relative drag-offset snap (from drag start) applied while Alt is held */
-    altTranslationSnap: number
+    /**
+     * Temporary translation snap (world/local units) while Ctrl/Command is held
+     * and `translationSnap` is unset.
+     */
+    temporaryTranslationSnap: number
+    /**
+     * Temporary rotation snap in degrees while Ctrl/Command is held and
+     * `rotationSnap` is unset.
+     */
+    temporaryRotationSnapDeg: number
+    /**
+     * Temporary scale snap (absolute scale units) while Ctrl/Command is held
+     * and `scaleSnap` is unset.
+     */
+    temporaryScaleSnap: number
   }
   /**
    * When true, show a degrees readout (e.g. `45°`) inside the rotation angle
@@ -137,8 +148,9 @@ export const defaultTheme: GizmoTheme = {
     originGhostRadius: 0.039,
   },
   snapping: {
-    shiftRotationSnapDeg: 15,
-    altTranslationSnap: 1,
+    temporaryTranslationSnap: 1,
+    temporaryRotationSnapDeg: 15,
+    temporaryScaleSnap: 0.25,
   },
   showSectorLabel: false,
   showScaleLabel: false,
