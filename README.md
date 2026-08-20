@@ -122,7 +122,7 @@ This intentionally diverges from three.js `TransformControls`, whose
 | `setSize(n)`                  | overall gizmo size multiplier                                    |
 | `setColors(x, y, z, active)`  | set axis + active/hover colors (also via `setTheme`)             |
 | `setTheme(partial)`           | merge a partial theme and rebuild the handles                    |
-| `getTheme()`                  | the resolved theme currently in use                              |
+| `getTheme()`                  | snapshot of the resolved theme (`setTheme` to change it)         |
 | `getHelper()`                 | returns `this` (for `scene.add(gizmo.getHelper())` migrations)   |
 | `getRaycaster()`              | the instance's `Raycaster`, e.g. to set `.layers`                |
 | `connect()` / `disconnect()`  | attach/remove DOM listeners (constructor connects)               |
@@ -132,27 +132,37 @@ This intentionally diverges from three.js `TransformControls`, whose
 
 `finishDrag()` is a no-op when no drag is active. `pointerup` and unexpected
 `lostpointercapture` commit via `finishDrag()`; `pointercancel` calls `reset()`.
-Changing mode, space, `enabled`, or the theme during a drag also commits
-(emitting `mouseUp` while `dragging` is still true, then `dragging-changed: false`).
+Changing mode, space, `scaleAnchor`, `enabled`, the attached `object`, or the
+theme during a drag also commits (emitting `mouseUp` while `dragging` is still
+true, then `dragging-changed: false`).
+
+Modifier keys are sampled from the latest pointer _and_ from `keydown` /
+`keyup`. Toggling Shift, Alt/Option, or Ctrl/Command mid-drag recomputes the
+transform from the pointer-down state at the last pointer position.
+
+A configured `*Snap` of `0` (or any non-positive number) means “no snap”,
+including while Ctrl/Command is held. `null` is unset: Ctrl/Command then uses
+the theme temporary default.
 
 ### Properties
 
-| Property                                         | Type         | Default       | Description                                |
-| ------------------------------------------------ | ------------ | ------------- | ------------------------------------------ |
-| `object`                                         | `Object3D    | null`         | `null`                                     | the attached object       |
-| `enabled`                                        | `boolean`    | `true`        | when false, pointer input is ignored       |
-| `size`                                           | `number`     | `1`           | size multiplier                            |
-| `mode`                                           | `GizmoMode`  | `'translate'` |                                            |
-| `space`                                          | `GizmoSpace` | `'world'`     | scale always uses local axes               |
-| `translationSnap` / `rotationSnap` / `scaleSnap` | `number      | null`         | `null`                                     |                           |
-| `showX` / `showY` / `showZ`                      | `boolean`    | `true`        | hides _and_ un-picks that axis             |
-| `showXY` / `showXZ` / `showYZ`                   | `boolean`    | `true`        | plane handle visibility                    |
-| `showE`                                          | `boolean`    | `true`        | screen-space rotate ring                   |
-| `showXYZE`                                       | `boolean`    | `true`        | trackball free-rotate (hidden in combined) |
-| `minX`/`maxX`/`minY`/`maxY`/`minZ`/`maxZ`        | `number`     | `±Infinity`   | translation clamps                         |
-| `viewport`                                       | `Vector4     | null`         | `null`                                     | sub-canvas pointer region |
-| `axis` _(readonly)_                              | `AxisId      | null`         |                                            | hovered/dragged handle    |
-| `dragging` _(readonly)_                          | `boolean`    |               |                                            |
+| Property                                         | Type          | Default       | Description                                |
+| ------------------------------------------------ | ------------- | ------------- | ------------------------------------------ |
+| `object`                                         | `Object3D     | null`         | `null`                                     | attached object; assign shows/hides like attach/detach |
+| `enabled`                                        | `boolean`     | `true`        | when false, pointer input is ignored       |
+| `size`                                           | `number`      | `1`           | size multiplier                            |
+| `mode`                                           | `GizmoMode`   | `'translate'` |                                            |
+| `space`                                          | `GizmoSpace`  | `'world'`     | scale always uses local axes               |
+| `scaleAnchor`                                    | `ScaleAnchor` | `'opposite'`  | `'opposite'` (extrude) or `'center'`       |
+| `translationSnap` / `rotationSnap` / `scaleSnap` | `number       | null`         | `null`                                     | `null` unset; `0` disables snap (incl. Ctrl)           |
+| `showX` / `showY` / `showZ`                      | `boolean`     | `true`        | hides _and_ un-picks that axis             |
+| `showXY` / `showXZ` / `showYZ`                   | `boolean`     | `true`        | plane handle visibility                    |
+| `showE`                                          | `boolean`     | `true`        | screen-space rotate ring                   |
+| `showXYZE`                                       | `boolean`     | `true`        | trackball free-rotate (hidden in combined) |
+| `minX`/`maxX`/`minY`/`maxY`/`minZ`/`maxZ`        | `number`      | `±Infinity`   | translation clamps                         |
+| `viewport`                                       | `Vector4      | null`         | `null`                                     | sub-canvas pointer region                              |
+| `axis` _(readonly)_                              | `AxisId       | null`         |                                            | hovered/dragged handle                                 |
+| `dragging` _(readonly)_                          | `boolean`     |               |                                            |
 
 ### Events
 

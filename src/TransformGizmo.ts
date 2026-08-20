@@ -148,6 +148,8 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
   private _shiftKey = false
   /** Ctrl or Command — platform-agnostic temporary snap. */
   private _ctrlKey = false
+  /** Last pointer used for an active drag; keyup/keydown re-apply from here. */
+  private _lastPointer: { clientX: number; clientY: number; pointerId: number } | null = null
   private _connected = false
 
   private _translate: TranslateGizmo
@@ -209,14 +211,14 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
     return this._object
   }
   set object(v: Object3D | null) {
-    this.setCompatProp(
-      'object',
-      this._object,
-      () => {
-        this._object = v
-      },
-      v,
-    )
+    if (v === this._object) return
+    this.finishDrag()
+    this._object = v
+    this.visible = v !== null
+    this.writeAxis(null)
+    this._operation = null
+    this.dispatchEvent({ type: 'object-changed', value: v })
+    this.dispatchEvent({ type: 'change' })
   }
 
   get enabled(): boolean {
@@ -521,6 +523,8 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
     if (anchor === this._scaleAnchor) return
     this.finishDrag()
     this._scaleAnchor = anchor
+    this.dispatchEvent({ type: 'scaleAnchor-changed', value: anchor })
+    this.dispatchEvent({ type: 'change' })
   }
 
   get axis(): AxisId | null {
@@ -608,11 +612,7 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
   }
 
   detach(): this {
-    this.finishDrag()
     this.object = null
-    this.visible = false
-    this.writeAxis(null)
-    this._operation = null
     return this
   }
 
@@ -636,6 +636,7 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
       this.dispatchEvent({ type: 'mouseUp', mode: op })
       this._dragging = false
       this._drag = null
+      this._lastPointer = null
       this._sector.hide()
       this._originTrail.hide()
       this.dispatchEvent({ type: 'dragging-changed', value: false })
@@ -662,8 +663,12 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
     this.finishDrag()
   }
 
+  /**
+   * Snapshot of the resolved theme. Mutating the returned object does not
+   * affect the gizmo — call {@link setTheme} to apply changes.
+   */
   getTheme(): GizmoTheme {
-    return this._theme
+    return mergeTheme(this._theme)
   }
 
   setTheme(partial: PartialTheme): void {
@@ -845,7 +850,7 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
     this._translate.expanded = this._mode === 'translate'
   }
 
-  private setRayFromEvent(event: PointerEvent): void {
+  private setRayFromEvent(event: { clientX: number; clientY: number }): void {
     const rect = this.domElement.getBoundingClientRect()
     const viewport = this.viewport
     let originX: number
@@ -1026,6 +1031,7 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
     } catch {
       // pointer already gone (pen lift / touch-cancel race) — drag ends on pointerup/cancel
     }
+    this._lastPointer = { clientX: event.clientX, clientY: event.clientY, pointerId: event.pointerId }
     this.dispatchEvent({ type: 'mouseDown', mode })
     this.dispatchEvent({ type: 'dragging-changed', value: true })
     this.dispatchEvent({ type: 'change' })
@@ -1041,19 +1047,28 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
       this.updateHover(this.pickHandle(event))
       return
     }
+    if (this.applyActiveDrag(event)) {
+      this.dispatchEvent({ type: 'objectChange' })
+      this.dispatchEvent({ type: 'change' })
+    }
+  }
+
+  /**
+   * Recompute the current drag from a pointer position using the modifier
+   * flags already stored on the instance (not the event's). Pointer-move and
+   * keyup/keydown share this so toggling Shift/Alt/Ctrl mid-drag does not jump.
+   */
+  private applyActiveDrag(event: { clientX: number; clientY: number; pointerId: number }): boolean {
     const drag = this._drag
-    if (!drag || event.pointerId !== drag.pointerId) return
-
+    if (!this._dragging || !drag || !this.object) return false
+    if (event.pointerId !== drag.pointerId) return false
+    this._lastPointer = { clientX: event.clientX, clientY: event.clientY, pointerId: event.pointerId }
     this.setRayFromEvent(event)
-    if (!intersectPlane(this._raycaster.ray, drag.plane, _v1)) return
-    const point = _v1
-
-    if (drag.mode === 'translate') this.applyTranslate(drag, point)
-    else if (drag.mode === 'rotate') this.applyRotate(drag, point)
-    else this.applyScale(drag, point)
-
-    this.dispatchEvent({ type: 'objectChange' })
-    this.dispatchEvent({ type: 'change' })
+    if (!intersectPlane(this._raycaster.ray, drag.plane, _v1)) return false
+    if (drag.mode === 'translate') this.applyTranslate(drag, _v1)
+    else if (drag.mode === 'rotate') this.applyRotate(drag, _v1)
+    else this.applyScale(drag, _v1)
+    return true
   }
 
   private keyChange(event: KeyboardEvent): void {
@@ -1065,7 +1080,9 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
     this._altKey = alt
     this._shiftKey = shift
     this._ctrlKey = ctrl
-    // refresh dashed scale guides while hovering / dragging without moving
+    if (this._lastPointer && this.applyActiveDrag(this._lastPointer)) {
+      this.dispatchEvent({ type: 'objectChange' })
+    }
     this.dispatchEvent({ type: 'change' })
   }
 
@@ -1100,32 +1117,28 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
 
   // ------------------------------------------------------------- drag: modes
 
-  /** Configured snap, else temporary Ctrl/Command default, else continuous. */
-  private activeTranslationSnap(): number | null {
-    if (this._translationSnap) return this._translationSnap
-    if (this._ctrlKey) {
-      const snap = this._theme.snapping.temporaryTranslationSnap
-      return snap || null
-    }
+  /**
+   * Configured snap if set (`null` = unset). A non-positive configured value
+   * disables snap, including Ctrl/Command temporary defaults. Unset + Ctrl
+   * uses the theme temporary interval when it is positive.
+   */
+  private resolveSnap(configured: number | null, temporary: number): number | null {
+    if (configured != null) return configured > 0 ? configured : null
+    if (this._ctrlKey && temporary > 0) return temporary
     return null
+  }
+
+  private activeTranslationSnap(): number | null {
+    return this.resolveSnap(this._translationSnap, this._theme.snapping.temporaryTranslationSnap)
   }
 
   private activeRotationSnap(): number | null {
-    if (this._rotationSnap) return this._rotationSnap
-    if (this._ctrlKey) {
-      const deg = this._theme.snapping.temporaryRotationSnapDeg
-      return deg ? (deg * Math.PI) / 180 : null
-    }
-    return null
+    const deg = this._theme.snapping.temporaryRotationSnapDeg
+    return this.resolveSnap(this._rotationSnap, deg > 0 ? (deg * Math.PI) / 180 : 0)
   }
 
   private activeScaleSnap(): number | null {
-    if (this._scaleSnap) return this._scaleSnap
-    if (this._ctrlKey) {
-      const snap = this._theme.snapping.temporaryScaleSnap
-      return snap || null
-    }
-    return null
+    return this.resolveSnap(this._scaleSnap, this._theme.snapping.temporaryScaleSnap)
   }
 
   private applyTranslate(drag: DragState, point: Vector3): void {
