@@ -1,6 +1,7 @@
 # @voluma/three-transform-gizmo
 
 <!-- Image shields. Do not flatten to [CI](url) text links. -->
+
 [![CI](https://github.com/Voluma-ai/three-transform-gizmo/actions/workflows/ci.yml/badge.svg)](https://github.com/Voluma-ai/three-transform-gizmo/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/@voluma/three-transform-gizmo.svg)](https://www.npmjs.com/package/@voluma/three-transform-gizmo)
 [![demo](https://img.shields.io/badge/demo-live-4c1.svg)](https://voluma-ai.github.io/three-transform-gizmo/)
