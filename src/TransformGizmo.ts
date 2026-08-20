@@ -140,6 +140,8 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
   /** operation of the hovered/dragged handle (needed when mode is `'combined'`) */
   private _operation: GizmoOperation | null = null
   private _dragging = false
+  /** true while `finishDrag()` is emitting, so listeners cannot re-enter it */
+  private _finishingDrag = false
   private _theme: GizmoTheme
   private _drag: DragState | null = null
   private _altKey = false
@@ -163,6 +165,8 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
   private _onPointerDown = (e: PointerEvent) => this.pointerDown(e)
   private _onPointerMove = (e: PointerEvent) => this.pointerMove(e)
   private _onPointerUp = (e: PointerEvent) => this.pointerUp(e)
+  private _onPointerCancel = (e: PointerEvent) => this.pointerCancel(e)
+  private _onLostPointerCapture = (e: PointerEvent) => this.lostPointerCapture(e)
   private _onKeyChange = (e: KeyboardEvent) => this.keyChange(e)
 
   constructor(camera: Camera, domElement: HTMLElement, options: TransformGizmoOptions = {}) {
@@ -221,7 +225,7 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
   set enabled(v: boolean) {
     if (v === this._enabled) return
     this._enabled = v
-    if (!v) this.endDrag()
+    if (!v) this.finishDrag()
     this.dispatchEvent({ type: 'enabled-changed', value: v })
     this.dispatchEvent({ type: 'change' })
   }
@@ -472,7 +476,7 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
   }
   set mode(m: GizmoMode) {
     if (m === this._mode) return
-    this.endDrag()
+    this.finishDrag()
     this._mode = m
     this.writeAxis(null)
     this._operation = null
@@ -492,7 +496,7 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
   }
   set space(s: GizmoSpace) {
     if (s === this._space) return
-    this.endDrag()
+    this.finishDrag()
     this._space = s
     this.dispatchEvent({ type: 'space-changed', value: s })
     this.dispatchEvent({ type: 'change' })
@@ -515,7 +519,7 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
    */
   setScaleAnchor(anchor: ScaleAnchor): void {
     if (anchor === this._scaleAnchor) return
-    this.endDrag()
+    this.finishDrag()
     this._scaleAnchor = anchor
   }
 
@@ -574,7 +578,8 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
     el.addEventListener('pointerdown', this._onPointerDown)
     el.addEventListener('pointermove', this._onPointerMove)
     el.addEventListener('pointerup', this._onPointerUp)
-    el.addEventListener('pointercancel', this._onPointerUp)
+    el.addEventListener('pointercancel', this._onPointerCancel)
+    el.addEventListener('lostpointercapture', this._onLostPointerCapture)
     el.ownerDocument?.addEventListener('keydown', this._onKeyChange)
     el.ownerDocument?.addEventListener('keyup', this._onKeyChange)
     el.style.touchAction = 'none'
@@ -588,7 +593,8 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
     el.removeEventListener('pointerdown', this._onPointerDown)
     el.removeEventListener('pointermove', this._onPointerMove)
     el.removeEventListener('pointerup', this._onPointerUp)
-    el.removeEventListener('pointercancel', this._onPointerUp)
+    el.removeEventListener('pointercancel', this._onPointerCancel)
+    el.removeEventListener('lostpointercapture', this._onLostPointerCapture)
     el.ownerDocument?.removeEventListener('keydown', this._onKeyChange)
     el.ownerDocument?.removeEventListener('keyup', this._onKeyChange)
     el.style.touchAction = ''
@@ -602,7 +608,7 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
   }
 
   detach(): this {
-    this.endDrag()
+    this.finishDrag()
     this.object = null
     this.visible = false
     this.writeAxis(null)
@@ -615,19 +621,45 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
     return this._raycaster
   }
 
+  /**
+   * Commit the current drag, keeping the attached object's transform.
+   * Releases pointer capture if this gizmo holds it. No-op when no drag is
+   * active, including re-entry from `mouseUp` / `dragging-changed` listeners.
+   */
+  finishDrag(): void {
+    if (!this._dragging || this._finishingDrag) return
+    this._finishingDrag = true
+    try {
+      this.releaseDragPointerCapture()
+      const op = this._drag?.mode ?? this._operation ?? 'translate'
+      // TransformControls: mouseUp while dragging is still true, then clear.
+      this.dispatchEvent({ type: 'mouseUp', mode: op })
+      this._dragging = false
+      this._drag = null
+      this._sector.hide()
+      this._originTrail.hide()
+      this.dispatchEvent({ type: 'dragging-changed', value: false })
+      this._operation = null
+      this.writeAxis(null)
+      this.dispatchEvent({ type: 'change' })
+    } finally {
+      this._finishingDrag = false
+    }
+  }
+
   /** cancel the current drag and restore the object's transform from drag start */
   reset(): void {
+    if (!this._dragging) return
     const drag = this._drag
-    if (!drag || !this.object) return
-    this.object.position.copy(drag.positionStart)
-    this.object.quaternion.copy(drag.quaternionStart)
-    this.object.scale.copy(drag.scaleStart)
-    if (this.domElement.hasPointerCapture(drag.pointerId)) {
-      this.domElement.releasePointerCapture(drag.pointerId)
+    const object = this.object
+    if (drag && object) {
+      object.position.copy(drag.positionStart)
+      object.quaternion.copy(drag.quaternionStart)
+      object.scale.copy(drag.scaleStart)
+      this.dispatchEvent({ type: 'objectChange' })
+      this.dispatchEvent({ type: 'change' })
     }
-    this.dispatchEvent({ type: 'objectChange' })
-    this.dispatchEvent({ type: 'change' })
-    this.endDrag()
+    this.finishDrag()
   }
 
   getTheme(): GizmoTheme {
@@ -635,7 +667,7 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
   }
 
   setTheme(partial: PartialTheme): void {
-    this.endDrag()
+    this.finishDrag()
     this._theme = mergeTheme(this._theme, partial)
     // rebuild gizmos with new geometry sizes/colors
     this.remove(this._translate, this._rotate, this._scale, this._sector, this._originTrail)
@@ -656,7 +688,7 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
   }
 
   dispose(): void {
-    this.endDrag()
+    this.finishDrag()
     this.disconnect()
     this._translate.dispose()
     this._rotate.dispose()
@@ -896,17 +928,15 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
     return { mode, axis }
   }
 
-  /** end an active drag (pointer up, detach, disable, theme rebuild) */
-  private endDrag(): void {
-    if (!this._dragging) return
-    const op = this._drag?.mode ?? this._operation ?? 'translate'
-    this._dragging = false
-    this._drag = null
-    this._sector.hide()
-    this._originTrail.hide()
-    this.dispatchEvent({ type: 'mouseUp', mode: op })
-    this.dispatchEvent({ type: 'dragging-changed', value: false })
-    this.dispatchEvent({ type: 'change' })
+  private releaseDragPointerCapture(): void {
+    const id = this._drag?.pointerId
+    if (id === undefined) return
+    if (!this.domElement.hasPointerCapture(id)) return
+    try {
+      this.domElement.releasePointerCapture(id)
+    } catch {
+      // capture already released (lostpointercapture race)
+    }
   }
 
   private pointerDown(event: PointerEvent): void {
@@ -1041,9 +1071,18 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
 
   private pointerUp(event: PointerEvent): void {
     if (!this._dragging || (this._drag && event.pointerId !== this._drag.pointerId)) return
-    if (this.domElement.hasPointerCapture(event.pointerId)) this.domElement.releasePointerCapture(event.pointerId)
-    this.endDrag()
+    this.finishDrag()
     this.updateHover(this.pickHandle(event))
+  }
+
+  private pointerCancel(event: PointerEvent): void {
+    if (!this._dragging || (this._drag && event.pointerId !== this._drag.pointerId)) return
+    this.reset()
+  }
+
+  private lostPointerCapture(event: PointerEvent): void {
+    if (!this._dragging || !this._drag || event.pointerId !== this._drag.pointerId) return
+    this.finishDrag()
   }
 
   /** apply a new hover handle, firing hoveron/hoveroff/change as needed */

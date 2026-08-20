@@ -126,11 +126,14 @@ This intentionally diverges from three.js `TransformControls`, whose
 | `getHelper()`                 | returns `this` (for `scene.add(gizmo.getHelper())` migrations)   |
 | `getRaycaster()`              | the instance's `Raycaster`, e.g. to set `.layers`                |
 | `connect()` / `disconnect()`  | attach/remove DOM listeners (constructor connects)               |
+| `finishDrag()`                | commit the active drag, keeping the current transform            |
 | `reset()`                     | cancel the active drag and restore the transform from drag start |
 | `dispose()`                   | disconnect listeners and free geometries/materials               |
 
-Changing mode, space, `enabled`, or the theme during a drag safely ends that
-drag first (emitting `mouseUp` and `dragging-changed: false`).
+`finishDrag()` is a no-op when no drag is active. `pointerup` and unexpected
+`lostpointercapture` commit via `finishDrag()`; `pointercancel` calls `reset()`.
+Changing mode, space, `enabled`, or the theme during a drag also commits
+(emitting `mouseUp` while `dragging` is still true, then `dragging-changed: false`).
 
 ### Properties
 
@@ -217,8 +220,9 @@ rather than every frame. The demo has a `size` slider (`npm run dev`).
 | `setColors(x, y, z, active)`                                                | ✅        | maps into theme colors                                               |
 | `connect()` / `disconnect()`                                                | ✅        |                                                                      |
 | `dragging`, `axis` (readonly)                                               | ✅        | scale: `'+X'`/`'-X'`/…, planes `'+XY'`/…, uniform `'XYZ'`            |
-| `getRaycaster()`, `reset()`                                                 | ✅        |                                                                      |
-| events `change`, `objectChange`, `dragging-changed`, `mouseDown`, `mouseUp` | ✅        | plus `*-changed` property events                                     |
+| `getRaycaster()`, `reset()`                                                 | ✅        | `reset()` cancels (restores drag-start transform)                    |
+| `finishDrag()`                                                              | ➕        | commit without restoring; use this instead of `reset()` on release   |
+| events `change`, `objectChange`, `dragging-changed`, `mouseDown`, `mouseUp` | ✅        | `mouseUp` while `dragging` is still true; plus `*-changed` events    |
 | `getHelper()`                                                               | ✅        | returns `this` — also fine to `scene.add(gizmo)` directly            |
 | `setTheme()` / `getTheme()`, `hoveron` / `hoveroff`                         | ➕        | extensions                                                           |
 
