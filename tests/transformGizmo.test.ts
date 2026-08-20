@@ -77,6 +77,9 @@ function move(pt: { x: number; y: number }, opts = {}) {
 function up(pt: { x: number; y: number }, opts = {}) {
   el.dispatch('pointerup', pointerEvent(pt.x, pt.y, opts))
 }
+function cancel(pt: { x: number; y: number }, opts = {}) {
+  el.dispatch('pointercancel', pointerEvent(pt.x, pt.y, opts))
+}
 
 /** drag from a handle by a pixel delta, in a few steps */
 function drag(from: { x: number; y: number }, dx: number, dy: number, opts = {}) {
@@ -547,23 +550,54 @@ describe('drag lifecycle safety', () => {
     ['enabled=false', (g: TransformGizmo) => void (g.enabled = false)],
     ['setMode', (g: TransformGizmo) => g.setMode('rotate')],
     ['setSpace', (g: TransformGizmo) => g.setSpace('local')],
+    ['setScaleAnchor', (g: TransformGizmo) => g.setScaleAnchor('center')],
     ['setTheme', (g: TransformGizmo) => g.setTheme({ colors: { x: 0x123456 } })],
     ['dispose', (g: TransformGizmo) => g.dispose()],
-  ])('%s during a drag ends it and reports dragging-changed:false', (_name, action) => {
+  ])('%s during a drag commits it and reports dragging-changed:false', (_name, action) => {
     let lastDragging: boolean | null = null
     gizmo.addEventListener('dragging-changed', (e) => {
       lastDragging = e.value
     })
     startDrag()
+    const pos = cube.position.clone()
+    const quat = cube.quaternion.clone()
+    const scl = cube.scale.clone()
     expect(gizmo.dragging).toBe(true)
     action(gizmo)
     expect(gizmo.dragging).toBe(false)
     expect(lastDragging).toBe(false)
+    expect(el.captured.size).toBe(0)
+    expect(cube.position.distanceTo(pos)).toBeCloseTo(0)
+    expect(cube.quaternion.angleTo(quat)).toBeCloseTo(0)
+    expect(cube.scale.distanceTo(scl)).toBeCloseTo(0)
+  })
+
+  it('finishDrag() keeps the transform from the last move', () => {
+    gizmo.setMode('scale')
+    const startPos = cube.position.clone()
+    const startQuat = cube.quaternion.clone()
+    const startScl = cube.scale.clone()
+    const pt = handlePoint(X, gizmo.getTheme().sizes.scaleHandleDistanceNonUniform)
+    down(pt)
+    move({ x: pt.x + 50, y: pt.y })
+    const pos = cube.position.clone()
+    const quat = cube.quaternion.clone()
+    const scl = cube.scale.clone()
+    expect(cube.scale.distanceTo(startScl)).not.toBeCloseTo(0)
+    expect(cube.position.distanceTo(startPos)).not.toBeCloseTo(0)
+    gizmo.finishDrag()
+    expect(cube.position.distanceTo(pos)).toBeCloseTo(0)
+    expect(cube.quaternion.angleTo(quat)).toBeCloseTo(0)
+    expect(cube.scale.distanceTo(scl)).toBeCloseTo(0)
+    expect(gizmo.dragging).toBe(false)
+    expect(el.captured.size).toBe(0)
+    expect(startQuat.angleTo(cube.quaternion)).toBeCloseTo(0)
   })
 
   it('reset() restores the transform captured at drag start', () => {
     gizmo.setMode('scale')
     const pos = cube.position.clone()
+    const quat = cube.quaternion.clone()
     const scl = cube.scale.clone()
     const pt = handlePoint(X, gizmo.getTheme().sizes.scaleHandleDistanceNonUniform)
     down(pt)
@@ -572,8 +606,104 @@ describe('drag lifecycle safety', () => {
     gizmo.reset()
     expect(cube.scale.distanceTo(scl)).toBeCloseTo(0)
     expect(cube.position.distanceTo(pos)).toBeCloseTo(0)
+    expect(cube.quaternion.angleTo(quat)).toBeCloseTo(0)
     expect(gizmo.dragging).toBe(false)
     expect(el.captured.size).toBe(0)
+  })
+
+  it('emits mouseUp while dragging, then dragging-changed:false', () => {
+    const seen: string[] = []
+    gizmo.addEventListener('mouseUp', () => {
+      seen.push(`mouseUp:dragging=${gizmo.dragging}`)
+    })
+    gizmo.addEventListener('dragging-changed', (e) => {
+      if (!e.value) seen.push(`dragging-changed:dragging=${gizmo.dragging}`)
+    })
+    startDrag()
+    gizmo.finishDrag()
+    expect(seen).toEqual(['mouseUp:dragging=true', 'dragging-changed:dragging=false'])
+  })
+
+  it('reentrant and repeated finishDrag() emit one drag-end sequence', () => {
+    const seen: string[] = []
+    gizmo.addEventListener('mouseUp', () => {
+      seen.push('mouseUp')
+      gizmo.finishDrag()
+      gizmo.reset()
+    })
+    gizmo.addEventListener('dragging-changed', (e) => {
+      if (!e.value) {
+        seen.push('dragging:false')
+        gizmo.finishDrag()
+      }
+    })
+    startDrag()
+    gizmo.finishDrag()
+    gizmo.finishDrag()
+    expect(seen.filter((s) => s === 'mouseUp')).toEqual(['mouseUp'])
+    expect(seen.filter((s) => s === 'dragging:false')).toEqual(['dragging:false'])
+    expect(gizmo.dragging).toBe(false)
+  })
+
+  it('finishDrag() is a no-op when idle', () => {
+    const seen: string[] = []
+    gizmo.addEventListener('mouseUp', () => seen.push('mouseUp'))
+    gizmo.addEventListener('dragging-changed', () => seen.push('dragging'))
+    gizmo.finishDrag()
+    expect(seen).toEqual([])
+    expect(gizmo.dragging).toBe(false)
+  })
+
+  it('pointerup commits the drag and releases capture', () => {
+    const start = cube.position.clone()
+    const pt = handlePoint(X, arrowTip())
+    down(pt)
+    expect(el.captured.has(1)).toBe(true)
+    move({ x: pt.x + 40, y: pt.y })
+    const dragged = cube.position.clone()
+    expect(dragged.distanceTo(start)).not.toBeCloseTo(0)
+    up({ x: pt.x + 40, y: pt.y })
+    expect(gizmo.dragging).toBe(false)
+    expect(el.captured.has(1)).toBe(false)
+    expect(cube.position.distanceTo(dragged)).toBeCloseTo(0)
+  })
+
+  it('pointercancel restores the drag-start transform and releases capture', () => {
+    const pos = cube.position.clone()
+    const quat = cube.quaternion.clone()
+    const scl = cube.scale.clone()
+    const pt = handlePoint(X, arrowTip())
+    down(pt)
+    move({ x: pt.x + 40, y: pt.y })
+    expect(cube.position.distanceTo(pos)).not.toBeCloseTo(0)
+    cancel({ x: pt.x + 40, y: pt.y })
+    expect(gizmo.dragging).toBe(false)
+    expect(el.captured.has(1)).toBe(false)
+    expect(cube.position.distanceTo(pos)).toBeCloseTo(0)
+    expect(cube.quaternion.angleTo(quat)).toBeCloseTo(0)
+    expect(cube.scale.distanceTo(scl)).toBeCloseTo(0)
+  })
+
+  it('lostpointercapture for the drag pointer commits the current transform', () => {
+    const pt = handlePoint(X, arrowTip())
+    down(pt)
+    move({ x: pt.x + 40, y: pt.y })
+    const dragged = cube.position.clone()
+    el.dispatch('lostpointercapture', pointerEvent(pt.x + 40, pt.y, { pointerId: 1 }))
+    expect(gizmo.dragging).toBe(false)
+    expect(el.captured.has(1)).toBe(false)
+    expect(cube.position.distanceTo(dragged)).toBeCloseTo(0)
+  })
+
+  it('lostpointercapture for an unrelated pointer is ignored', () => {
+    const pt = handlePoint(X, arrowTip())
+    down(pt, { pointerId: 1 })
+    move({ x: pt.x + 30, y: pt.y }, { pointerId: 1 })
+    el.dispatch('lostpointercapture', pointerEvent(10, 400, { pointerId: 2 }))
+    expect(gizmo.dragging).toBe(true)
+    expect(el.captured.has(1)).toBe(true)
+    up({ x: pt.x + 30, y: pt.y }, { pointerId: 1 })
+    expect(gizmo.dragging).toBe(false)
   })
 
   it('ignores events from a second pointer during a drag', () => {
