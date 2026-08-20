@@ -16,7 +16,7 @@ import { ModeGizmo } from '../src/gizmos/ModeGizmo'
 import { twistAngleAroundAxis } from '../src/core/Snapping'
 import { TransformGizmo } from '../src/TransformGizmo'
 import type { AxisId } from '../src/types'
-import { createFakeElement, HEIGHT, pointerEvent, WIDTH, type FakeElement } from './helpers/fakeDom'
+import { createFakeElement, HEIGHT, keyEvent, pointerEvent, WIDTH, type FakeElement } from './helpers/fakeDom'
 
 /**
  * End-to-end tests of the interaction pipeline, driven through the same
@@ -80,6 +80,9 @@ function up(pt: { x: number; y: number }, opts = {}) {
 function cancel(pt: { x: number; y: number }, opts = {}) {
   el.dispatch('pointercancel', pointerEvent(pt.x, pt.y, opts))
 }
+function key(opts: { altKey?: boolean; shiftKey?: boolean; ctrlKey?: boolean; metaKey?: boolean } = {}) {
+  el.dispatch('keydown', keyEvent(opts))
+}
 
 /** drag from a handle by a pixel delta, in a few steps */
 function drag(from: { x: number; y: number }, dx: number, dy: number, opts = {}) {
@@ -122,6 +125,18 @@ describe('attach / detach / visibility', () => {
     drag(handlePoint(X, arrowTip()), 60, 0)
     expect(cube.position.equals(before)).toBe(true)
     expect(gizmo.dragging).toBe(false)
+  })
+
+  it('shows the gizmo when object is assigned, hides when cleared', () => {
+    const g = new TransformGizmo(camera, el as unknown as HTMLElement)
+    expect(g.visible).toBe(false)
+    g.object = cube
+    expect(g.visible).toBe(true)
+    expect(g.object).toBe(cube)
+    g.object = null
+    expect(g.visible).toBe(false)
+    expect(g.object).toBeNull()
+    g.dispose()
   })
 })
 
@@ -227,6 +242,27 @@ describe('translate', () => {
     drag(handlePoint(X, arrowTip()), 80, 0)
     expect(cube.position.x).not.toBeCloseTo(Math.round(cube.position.x))
     expect(cube.position.x).toBeGreaterThan(0.37)
+  })
+
+  it('treats a configured snap of 0 as off, even with Ctrl', () => {
+    cube.position.set(0.37, 0, 0)
+    scene.updateMatrixWorld(true)
+    gizmo.setTranslationSnap(0)
+    drag(handlePoint(X, arrowTip()), 80, 0, { ctrlKey: true })
+    expect(cube.position.x).not.toBeCloseTo(Math.round(cube.position.x))
+    expect(cube.position.x).toBeGreaterThan(0.37)
+  })
+
+  it('snaps when Ctrl is pressed mid-drag', () => {
+    cube.position.set(0.37, 0, 0)
+    scene.updateMatrixWorld(true)
+    const pt = handlePoint(X, arrowTip())
+    down(pt)
+    move({ x: pt.x + 80, y: pt.y })
+    expect(cube.position.x).not.toBeCloseTo(Math.round(cube.position.x))
+    key({ ctrlKey: true })
+    expect(cube.getWorldPosition(new Vector3()).x % 1).toBeCloseTo(0)
+    up({ x: pt.x + 80, y: pt.y }, { ctrlKey: true })
   })
 
   it('respects a translated parent when snapping in world space', () => {
@@ -442,6 +478,50 @@ describe('scale (extrude)', () => {
     g.dispose()
   })
 
+  it('emits scaleAnchor-changed with change', () => {
+    const anchors: string[] = []
+    let changes = 0
+    gizmo.addEventListener('scaleAnchor-changed', (e) => {
+      anchors.push(e.value)
+    })
+    gizmo.addEventListener('change', () => {
+      changes++
+    })
+    gizmo.setScaleAnchor('center')
+    expect(gizmo.scaleAnchor).toBe('center')
+    expect(anchors).toEqual(['center'])
+    expect(changes).toBeGreaterThanOrEqual(1)
+    gizmo.scaleAnchor = 'center'
+    expect(anchors).toEqual(['center'])
+  })
+
+  it('recomputes the scale drag when Alt is toggled without moving', () => {
+    gizmo.setMode('scale')
+    const pt = handlePoint(X, scaleDist())
+    down(pt)
+    move({ x: pt.x + 60, y: pt.y })
+    expect(cube.scale.x).toBeGreaterThan(1.05)
+    expect(cube.position.length()).not.toBeCloseTo(0)
+    key({ altKey: true })
+    expect(cube.position.length()).toBeCloseTo(0)
+    el.dispatch('keyup', keyEvent({}))
+    expect(cube.position.length()).not.toBeCloseTo(0)
+    up({ x: pt.x + 60, y: pt.y })
+  })
+
+  it('recomputes proportional scale when Shift is pressed mid-drag', () => {
+    gizmo.setMode('scale')
+    const pt = handlePoint(X, scaleDist())
+    down(pt)
+    move({ x: pt.x + 60, y: pt.y })
+    expect(cube.scale.x).toBeGreaterThan(1.05)
+    expect(cube.scale.y).toBeCloseTo(1)
+    key({ shiftKey: true })
+    expect(cube.scale.y).toBeCloseTo(cube.scale.x)
+    expect(cube.position.length()).toBeCloseTo(0)
+    up({ x: pt.x + 60, y: pt.y }, { shiftKey: true })
+  })
+
   it('falls back to center anchoring when the object has no measurable geometry', () => {
     // a splat container: nothing to bound, so there is no opposite face to pin
     const empty = new Group()
@@ -551,6 +631,7 @@ describe('drag lifecycle safety', () => {
     ['setMode', (g: TransformGizmo) => g.setMode('rotate')],
     ['setSpace', (g: TransformGizmo) => g.setSpace('local')],
     ['setScaleAnchor', (g: TransformGizmo) => g.setScaleAnchor('center')],
+    ['object=null', (g: TransformGizmo) => void (g.object = null)],
     ['setTheme', (g: TransformGizmo) => g.setTheme({ colors: { x: 0x123456 } })],
     ['dispose', (g: TransformGizmo) => g.dispose()],
   ])('%s during a drag commits it and reports dragging-changed:false', (_name, action) => {
@@ -762,6 +843,16 @@ describe('theming', () => {
     // dedicated translate mode tips sit at scaleHandleDistanceNonUniform
     move(handlePoint(X, gizmo.getTheme().sizes.scaleHandleDistanceNonUniform))
     expect(gizmo.axis).toBe('X' as AxisId)
+  })
+
+  it('returns a snapshot that does not mutate the live theme', () => {
+    const snap = gizmo.getTheme()
+    const originalX = snap.colors.x
+    const originalLen = snap.sizes.arrowLength
+    snap.colors.x = 0x000001
+    snap.sizes.arrowLength = 99
+    expect(gizmo.getTheme().colors.x).toBe(originalX)
+    expect(gizmo.getTheme().sizes.arrowLength).toBeCloseTo(originalLen)
   })
 })
 

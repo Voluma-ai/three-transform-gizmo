@@ -85,6 +85,7 @@ export interface GizmoEventMap {
   'axis-changed': PropChanged<AxisId | null>
   'mode-changed': PropChanged<GizmoMode>
   'space-changed': PropChanged<GizmoSpace>
+  'scaleAnchor-changed': PropChanged<ScaleAnchor>
   'size-changed': PropChanged<number>
   'translationSnap-changed': PropChanged<number | null>
   'rotationSnap-changed': PropChanged<number | null>

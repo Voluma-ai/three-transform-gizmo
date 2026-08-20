@@ -6,6 +6,23 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `scaleAnchor-changed` on `setScaleAnchor()` / `.scaleAnchor`, matching other
+  property setters.
+
+### Changed
+
+- `getTheme()` returns a snapshot. Mutating it no longer touches the live theme;
+  call `setTheme()` to apply changes.
+- Assigning `.object` shows or hides the gizmo the same way as `attach()` /
+  `detach()`. `null` ends an active drag.
+- Toggling Shift, Alt/Option, or Ctrl/Command mid-drag recomputes the transform
+  at the last pointer position (previously only the next `pointermove` applied
+  the new modifiers).
+- A configured `translationSnap` / `rotationSnap` / `scaleSnap` of `0` disables
+  snap, including Ctrl/Command temporary defaults (`null` remains “unset”).
+
 ## [0.9.1] - 2026-08-20
 
 ### Added

@@ -92,3 +92,14 @@ export function pointerEvent(clientX: number, clientY: number, opts: PointerOpts
     isPrimary: opts.isPrimary ?? true,
   }
 }
+
+export function keyEvent(
+  opts: Pick<PointerOpts, 'altKey' | 'shiftKey' | 'ctrlKey' | 'metaKey'> = {},
+): Record<string, unknown> {
+  return {
+    altKey: opts.altKey ?? false,
+    shiftKey: opts.shiftKey ?? false,
+    ctrlKey: opts.ctrlKey ?? false,
+    metaKey: opts.metaKey ?? false,
+  }
+}
