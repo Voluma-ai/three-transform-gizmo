@@ -105,7 +105,7 @@ type DemoPrefs = {
   size: number
 }
 const defaultPrefs: DemoPrefs = {
-  mode: 'translate',
+  mode: 'combined',
   space: 'world',
   object: 0,
   snap: false,
