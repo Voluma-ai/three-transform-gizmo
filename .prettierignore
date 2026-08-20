@@ -1,4 +1,7 @@
 dist
+demo-dist
 node_modules
 coverage
 package-lock.json
+tests/visual/goldens
+tests/visual/__diff__

@@ -6,11 +6,13 @@ import {
   LineDashedMaterial,
   Mesh,
   MeshBasicMaterial,
+  OrthographicCamera,
   PerspectiveCamera,
   Quaternion,
   Scene,
   Vector3,
   Vector4,
+  type Camera,
 } from 'three'
 import { ModeGizmo } from '../src/gizmos/ModeGizmo'
 import { twistAngleAroundAxis } from '../src/core/Snapping'
@@ -51,13 +53,13 @@ beforeEach(() => {
 })
 
 /** project a world point to fake-canvas pixel coordinates */
-function toScreen(p: Vector3): { x: number; y: number } {
-  const v = p.clone().project(camera)
+function toScreen(p: Vector3, cam: Camera = camera): { x: number; y: number } {
+  const v = p.clone().project(cam)
   return { x: ((v.x + 1) / 2) * WIDTH, y: ((1 - v.y) / 2) * HEIGHT }
 }
 
 /** screen position of a point at `dist` along a local axis, in gizmo units */
-function handlePoint(dir: Vector3, dist: number): { x: number; y: number } {
+function handlePoint(dir: Vector3, dist: number, cam: Camera = camera): { x: number; y: number } {
   gizmo.updateMatrixWorld(true)
   const world = cube.getWorldPosition(new Vector3()).add(
     dir
@@ -65,7 +67,7 @@ function handlePoint(dir: Vector3, dist: number): { x: number; y: number } {
       .normalize()
       .multiplyScalar(gizmo.scale.x * dist),
   )
-  return toScreen(world)
+  return toScreen(world, cam)
 }
 
 function down(pt: { x: number; y: number }, opts = {}) {
@@ -95,6 +97,7 @@ function drag(from: { x: number; y: number }, dx: number, dy: number, opts = {})
 
 const X = new Vector3(1, 0, 0)
 const Y = new Vector3(0, 1, 0)
+const Z = new Vector3(0, 0, 1)
 
 const ALL_SHOW = { x: true, y: true, z: true, xy: true, xz: true, yz: true, e: true, xyze: true }
 
@@ -185,6 +188,11 @@ describe('hover picking', () => {
     move(handlePoint(X, arrowTip()))
     expect(gizmo.axis).not.toBe('X')
   })
+
+  it('picks with touch pointerType the same as mouse', () => {
+    move(handlePoint(X, arrowTip()), { pointerType: 'touch' })
+    expect(gizmo.axis).toBe('X')
+  })
 })
 
 describe('translate', () => {
@@ -193,6 +201,12 @@ describe('translate', () => {
     expect(cube.position.x).toBeGreaterThan(0.1)
     expect(cube.position.y).toBeCloseTo(0)
     expect(cube.position.z).toBeCloseTo(0)
+  })
+
+  it('translates from a touch pointer', () => {
+    drag(handlePoint(X, arrowTip()), 60, 0, { pointerType: 'touch' })
+    expect(cube.position.x).toBeGreaterThan(0.1)
+    expect(cube.position.y).toBeCloseTo(0)
   })
 
   it('snaps world translation to the global grid when translationSnap is set', () => {
@@ -888,6 +902,45 @@ describe('screen-constant sizing', () => {
   })
 })
 
+describe('orthographic picking', () => {
+  function makeOrtho(): OrthographicCamera {
+    const aspect = WIDTH / HEIGHT
+    const halfH = 4
+    const cam = new OrthographicCamera(-halfH * aspect, halfH * aspect, halfH, -halfH, 0.1, 100)
+    cam.position.set(4, 3.5, 6)
+    cam.lookAt(0, 0, 0)
+    cam.updateMatrixWorld(true)
+    return cam
+  }
+
+  it('picks and drags an axis through an orthographic camera', () => {
+    const ortho = makeOrtho()
+    gizmo.camera = ortho
+    gizmo.updateMatrixWorld(true)
+    const tip = handlePoint(X, arrowTip(), ortho)
+    move(tip)
+    expect(gizmo.axis).toBe('X')
+    drag(tip, 80, 0)
+    expect(cube.position.x).toBeGreaterThan(0.1)
+    expect(cube.position.y).toBeCloseTo(0)
+  })
+
+  it('does not pick using the previous camera after camera is swapped', () => {
+    const tipPerspective = handlePoint(X, arrowTip())
+    move(tipPerspective)
+    expect(gizmo.axis).toBe('X')
+
+    const ortho = makeOrtho()
+    ortho.position.set(-4, 3.5, 6)
+    ortho.lookAt(0, 0, 0)
+    ortho.updateMatrixWorld(true)
+    gizmo.camera = ortho
+    gizmo.updateMatrixWorld(true)
+    move(tipPerspective)
+    expect(gizmo.axis).not.toBe('X')
+  })
+})
+
 describe('combined mode', () => {
   function modeChildren(): ModeGizmo[] {
     return gizmo.children.filter((c): c is ModeGizmo => c instanceof ModeGizmo)
@@ -1343,18 +1396,42 @@ describe('TransformControls API parity', () => {
     expect(changes).toBeGreaterThanOrEqual(2)
   })
 
+  function planePoint(dir: Vector3): { x: number; y: number } {
+    const planeDist = gizmo.getTheme().sizes.planeOffset
+    return toScreen(cube.getWorldPosition(new Vector3()).add(dir.clone().multiplyScalar(planeDist * gizmo.scale.x)))
+  }
+
   it('hides plane picking when showXY is false', () => {
     gizmo.setMode('translate')
     gizmo.updateMatrixWorld(true)
-    const planeDist = gizmo.getTheme().sizes.planeOffset
-    const pt = toScreen(
-      cube.getWorldPosition(new Vector3()).add(new Vector3(planeDist, planeDist, 0).multiplyScalar(gizmo.scale.x)),
-    )
+    const pt = planePoint(new Vector3(1, 1, 0))
     move(pt)
     expect(gizmo.axis).toBe('XY' as AxisId)
     gizmo.showXY = false
     move(pt)
     expect(gizmo.axis).not.toBe('XY' as AxisId)
+  })
+
+  it('hides plane picking when showXZ is false', () => {
+    gizmo.setMode('translate')
+    gizmo.updateMatrixWorld(true)
+    const pt = planePoint(new Vector3(1, 0, 1))
+    move(pt)
+    expect(gizmo.axis).toBe('XZ' as AxisId)
+    gizmo.showXZ = false
+    move(pt)
+    expect(gizmo.axis).not.toBe('XZ' as AxisId)
+  })
+
+  it('hides plane picking when showYZ is false', () => {
+    gizmo.setMode('translate')
+    gizmo.updateMatrixWorld(true)
+    const pt = planePoint(new Vector3(0, 1, 1))
+    move(pt)
+    expect(gizmo.axis).toBe('YZ' as AxisId)
+    gizmo.showYZ = false
+    move(pt)
+    expect(gizmo.axis).not.toBe('YZ' as AxisId)
   })
 
   it('hides E ring picking when showE is false', () => {
@@ -1412,6 +1489,42 @@ describe('TransformControls API parity', () => {
     drag(handlePoint(X, gizmo.getTheme().sizes.scaleHandleDistanceNonUniform), 200, 0)
     expect(cube.position.x).toBeLessThanOrEqual(0.2 + 1e-6)
     expect(cube.position.x).toBeGreaterThan(0)
+  })
+
+  it('clamps translation with minY / maxZ', () => {
+    gizmo.setMode('translate')
+    gizmo.minY = 0.3
+    gizmo.maxZ = -0.05
+    drag(handlePoint(Y, gizmo.getTheme().sizes.scaleHandleDistanceNonUniform), 0, -80)
+    expect(cube.position.y).toBeGreaterThanOrEqual(0.3 - 1e-6)
+    drag(handlePoint(Z, gizmo.getTheme().sizes.scaleHandleDistanceNonUniform), 80, 0)
+    expect(cube.position.z).toBeLessThanOrEqual(-0.05 + 1e-6)
+  })
+
+  it('emits camera-changed and picks with the assigned camera', () => {
+    const cameras: Camera[] = []
+    gizmo.addEventListener('camera-changed', (e) => {
+      cameras.push(e.value)
+    })
+    const next = new PerspectiveCamera(50, WIDTH / HEIGHT, 0.1, 100)
+    next.position.copy(camera.position)
+    next.quaternion.copy(camera.quaternion)
+    next.updateMatrixWorld(true)
+    gizmo.camera = next
+    expect(cameras).toEqual([next])
+    move(handlePoint(X, arrowTip(), next))
+    expect(gizmo.axis).toBe('X')
+  })
+
+  it('respects raycaster layers when picking', () => {
+    move(handlePoint(X, arrowTip()))
+    expect(gizmo.axis).toBe('X')
+    gizmo.getRaycaster().layers.disable(0)
+    move(handlePoint(X, arrowTip()))
+    expect(gizmo.axis).toBeNull()
+    gizmo.getRaycaster().layers.enable(0)
+    move(handlePoint(X, arrowTip()))
+    expect(gizmo.axis).toBe('X')
   })
 
   it('disconnect stops pointer handling; connect restores it', () => {

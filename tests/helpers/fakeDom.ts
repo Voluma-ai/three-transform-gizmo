@@ -77,6 +77,7 @@ export interface PointerOpts {
   ctrlKey?: boolean
   metaKey?: boolean
   isPrimary?: boolean
+  pointerType?: string
 }
 
 export function pointerEvent(clientX: number, clientY: number, opts: PointerOpts = {}): Record<string, unknown> {
@@ -90,6 +91,7 @@ export function pointerEvent(clientX: number, clientY: number, opts: PointerOpts
     ctrlKey: opts.ctrlKey ?? false,
     metaKey: opts.metaKey ?? false,
     isPrimary: opts.isPrimary ?? true,
+    pointerType: opts.pointerType ?? 'mouse',
   }
 }
 

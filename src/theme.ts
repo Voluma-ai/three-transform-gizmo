@@ -1,6 +1,8 @@
 /**
  * Visual theme for the gizmo. Pass a partial theme to the constructor or
  * setTheme() — it is deep-merged over the defaults.
+ *
+ * Field names are part of the 1.0 public API and will not be renamed until 2.0.
  */
 export interface GizmoTheme {
   colors: {
