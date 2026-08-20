@@ -1,0 +1,21 @@
+---
+description: Keep README status badges as image shields, never flatten them to text links
+alwaysApply: true
+---
+
+# README badges
+
+The heading under `# @voluma/three-transform-gizmo` must stay **image shields**.
+
+Do not replace `[![CI](…badge.svg)](url)` with `[CI](url)`. The `![]()` is the badge; dropping it is a regression.
+
+Required pattern (CI, npm version, demo, license):
+
+```markdown
+[![CI](https://github.com/Voluma-ai/three-transform-gizmo/actions/workflows/ci.yml/badge.svg)](https://github.com/Voluma-ai/three-transform-gizmo/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/@voluma/three-transform-gizmo.svg)](https://www.npmjs.com/package/@voluma/three-transform-gizmo)
+[![demo](https://img.shields.io/badge/demo-live-4c1.svg)](https://voluma-ai.github.io/three-transform-gizmo/)
+[![license](https://img.shields.io/github/license/Voluma-ai/three-transform-gizmo.svg)](./LICENSE)
+```
+
+When editing README.md, patch other sections. Leave this block unless the URLs themselves change.

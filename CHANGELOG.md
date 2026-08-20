@@ -6,13 +6,45 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+1.0.0 is the first stable release. Further breaking changes are 2.0.
+
+Public API is `TransformGizmo`, theme types (`GizmoTheme`, `PartialTheme`,
+`defaultTheme`, `mergeTheme`), and the event / mode / axis types exported from
+the package root. Internals under `src/core/*` and `src/gizmos/*` are not
+semver-guaranteed.
+
+`GizmoTheme` keys are frozen. 0.7–0.9 already renamed snap fields, `gizmoSize`,
+`gripSize`, and `labelSize`.
+
+Frozen divergences from three.js `TransformControls`:
+
+- Space-aware snap: world translation and constrained world rotation snap to
+  global grids; local snaps relative to the drag-start transform. Screen and
+  trackball rotation stay relative. Upstream `rotationSnap` is always
+  incremental.
+- World translation snap uses true world coordinates (including rotated/scaled
+  parents), not TransformControls' parent-translation approximation.
+- Detached `object` is `null` (upstream uses `undefined`).
+- Scale axis ids stay signed (`+X` / `-X` / …) for extrude.
+- `finishDrag()` commits; `reset()` cancels and restores drag-start.
+- `getHelper()` returns `this`.
+
 ### Added
 
+- Hosted demo on GitHub Pages (`demo/`, deployed from CI).
+- README badges for CI status and the published npm version.
 - `scaleAnchor-changed` on `setScaleAnchor()` / `.scaleAnchor`, matching other
   property setters.
+- Stability policy in the README (public API vs internals; theme keys frozen).
+- Screenshot tests for translate / rotate / scale / combined in local and world
+  space, plus a rotate-sector pose and a scale-extrude pose.
+- Interaction tests for orthographic picking, `minY` / `maxZ`, `showXZ` /
+  `showYZ`, camera assignment and raycaster layers, and touch `pointerType`.
 
 ### Changed
 
+- Dev toolchain (Vite 8, Vitest 4) so `npm audit` is clean. Runtime still
+  depends only on the `three` peer.
 - `getTheme()` returns a snapshot. Mutating it no longer touches the live theme;
   call `setTheme()` to apply changes.
 - Assigning `.object` shows or hides the gizmo the same way as `attach()` /

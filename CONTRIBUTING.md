@@ -9,10 +9,16 @@ npm install
 npm run dev     # interactive demo at http://localhost:5173
 ```
 
+The same demo is built with `npm run build:demo` and published to GitHub Pages
+on pushes to `main`: https://voluma-ai.github.io/three-transform-gizmo/
+
 The demo scene deliberately includes the awkward cases: a plain cube, a cube
 inside a rotated + non-uniformly scaled parent, and a mesh with off-center
 geometry. **Verify visually in the demo** — the extrude anchor and the angle
 sector are geometry problems that a passing unit test does not fully cover.
+CI also captures a small screenshot set (`npm run test:visual`) for idle
+translate / rotate / scale / combined in local and world space, plus a rotate
+sector pose and a scale extrude pose.
 
 ## Checks
 
@@ -21,20 +27,29 @@ npm run check   # typecheck + lint + tests
 npm run build   # ESM + CJS + d.ts into dist/
 ```
 
-CI runs the same checks plus a matrix over the lowest supported three version,
-the pinned version, and `latest`. Please make sure `npm run check` passes and
-run `npm run format` before opening a pull request.
+CI runs the same checks, `npm audit`, the visual screenshots, plus a matrix
+over the lowest supported three version, the pinned version, and `latest`.
+Please make sure `npm run check` passes and run `npm run format` before opening
+a pull request.
 
 ## Tests
+
+Tests are required for behavior changes. `npm run check` must pass.
 
 - `tests/*.test.ts` — pure math (`ExtrudeMath`, `Snapping`, `DragPlane`,
   `ScreenScale`). Assert _invariants_ (e.g. "the anchored face does not move in
   world space"), not literal output values.
 - `tests/transformGizmo.test.ts` — the full interaction pipeline, driven through
   synthetic pointer events against a fake DOM element
-  (`tests/helpers/fakeDom.ts`). No browser or jsdom needed.
+  (`tests/helpers/fakeDom.ts`). No browser or jsdom needed. New interaction
+  behavior belongs here (orthographic picking, clamps, show flags, camera /
+  layers, `pointerType`, mid-drag modifier recompute).
+- `tests/visual/` — Playwright screenshots of `demo/visual.html`. Install
+  Chromium once with `node node_modules/playwright-core/cli.js install chromium`,
+  then `npm run test:visual`. Geometry-sensitive handle changes should update
+  goldens with `UPDATE_SNAPSHOTS=1`.
 
-New interaction behavior should come with a test in the latter file.
+Do not rename `GizmoTheme` keys; they are frozen until 2.0.
 
 ## Conventions
 

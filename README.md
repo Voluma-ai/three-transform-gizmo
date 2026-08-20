@@ -1,8 +1,11 @@
 # @voluma/three-transform-gizmo
 
-[CI](https://github.com/Voluma-ai/three-transform-gizmo/actions/workflows/ci.yml)
-[npm](https://www.npmjs.com/package/@voluma/three-transform-gizmo)
-[license](./LICENSE)
+<!-- Image shields. Do not flatten to [CI](url) text links. -->
+
+[![CI](https://github.com/Voluma-ai/three-transform-gizmo/actions/workflows/ci.yml/badge.svg)](https://github.com/Voluma-ai/three-transform-gizmo/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/@voluma/three-transform-gizmo.svg)](https://www.npmjs.com/package/@voluma/three-transform-gizmo)
+[![demo](https://img.shields.io/badge/demo-live-4c1.svg)](https://voluma-ai.github.io/three-transform-gizmo/)
+[![license](https://img.shields.io/github/license/Voluma-ai/three-transform-gizmo.svg)](./LICENSE)
 
 A near drop-in replacement for `TransformControls` with **extrude-style scaling**,  
 **rotation angle feedback**, and **themeable styling**.
@@ -212,7 +215,8 @@ Overall size uses `setSize()` / `.size` (default `1`), matching
 `gripSize`, `labelSize`, …) tune individual handle geometry on top of that.
 
 `setTheme()` rebuilds the handle meshes, so prefer setting it on state changes
-rather than every frame. The demo has a `size` slider (`npm run dev`).
+rather than every frame. The [hosted demo](https://voluma-ai.github.io/three-transform-gizmo/)
+has a `size` slider (`npm run dev` locally).
 
 ## Migrating from `TransformControls`
 
@@ -253,6 +257,28 @@ stay signed for extrude.
   orientation each frame, so parenting it to a transformed group will misalign it.
 - **Call** `dispose()` when you are done — it owns DOM listeners on `domElement`.
 
+## Stability
+
+1.0 treats the **public API** as:
+
+- `TransformGizmo` and `TransformGizmoOptions`
+- theme types and helpers (`GizmoTheme`, `PartialTheme`, `defaultTheme`, `mergeTheme`)
+- exported events, modes, and axis types (`GizmoEventMap`, `GizmoMode`, `GizmoOperation`, `GizmoSpace`, `ScaleAnchor`, `AxisId`, `GizmoShowFlags`)
+
+Internals under `src/core/*` and `src/gizmos/*` are **not** semver-guaranteed. Import the package root, not those paths.
+
+`GizmoTheme` keys are frozen. New fields may appear in a minor; renaming or
+removing existing keys is 2.0.
+
+Breaking changes to the public API are 2.0. These divergences from `TransformControls` are frozen on the same schedule:
+
+- Space-aware snap (world grids vs local drag-start increments; screen/trackball stay relative)
+- World translation snap in true world coordinates, including rotated/scaled parents
+- Detached `object` is `null` (upstream uses `undefined`)
+- Signed scale axis ids (`+X` / `-X` / …) for extrude
+- `finishDrag()` commits; `reset()` cancels and restores drag-start
+- `getHelper()` returns `this`
+
 ## Compatibility
 
 - three.js `>=0.156.0` (CI covers 0.156, 0.185, and `latest`).
@@ -264,10 +290,14 @@ stay signed for extrude.
 
 ```bash
 npm install
-npm run dev     # demo at http://localhost:5173
-npm run check   # typecheck + lint + tests
-npm run build   # dist/
+npm run dev          # demo at http://localhost:5173
+npm run build:demo   # static site in demo-dist/ (GitHub Pages)
+npm run check        # typecheck + lint + tests
+npm run test:visual  # Playwright screenshots (needs Chromium)
+npm run build        # dist/
 ```
+
+Live demo: https://voluma-ai.github.io/three-transform-gizmo/
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md).
 

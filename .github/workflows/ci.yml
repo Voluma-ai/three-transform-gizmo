@@ -16,11 +16,16 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: npm audit
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run format:check
+      - run: npm run check:readme
       - run: npm test
+      - run: node node_modules/playwright-core/cli.js install --with-deps chromium
+      - run: npm run test:visual
       - run: npm run build
+      - run: npm run build:demo
 
   three-versions:
     name: three ${{ matrix.three }}
