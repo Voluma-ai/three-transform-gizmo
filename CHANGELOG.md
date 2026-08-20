@@ -6,7 +6,9 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-1.0.0 is the first stable release. Further breaking changes are 2.0.
+## [1.0.0] - 2026-08-21
+
+First stable release. Further breaking changes to the public API are 2.0.
 
 Public API is `TransformGizmo`, theme types (`GizmoTheme`, `PartialTheme`,
 `defaultTheme`, `mergeTheme`), and the event / mode / axis types exported from
@@ -14,7 +16,8 @@ the package root. Internals under `src/core/*` and `src/gizmos/*` are not
 semver-guaranteed.
 
 `GizmoTheme` keys are frozen. 0.7–0.9 already renamed snap fields, `gizmoSize`,
-`gripSize`, and `labelSize`.
+`gripSize`, and `labelSize`. New theme fields may appear in a minor; renaming
+or removing existing keys is 2.0.
 
 Frozen divergences from three.js `TransformControls`:
 
@@ -29,9 +32,14 @@ Frozen divergences from three.js `TransformControls`:
 - `finishDrag()` commits; `reset()` cancels and restores drag-start.
 - `getHelper()` returns `this`.
 
+No library behavior change versus 0.9.3.
+
+## [0.9.3] - 2026-08-20
+
 ### Added
 
-- Hosted demo on GitHub Pages (`demo/`, deployed from CI).
+- Hosted demo on GitHub Pages (`demo/`, deployed from CI). Demo defaults to
+  combined mode.
 - README badges for CI status and the published npm version.
 - `scaleAnchor-changed` on `setScaleAnchor()` / `.scaleAnchor`, matching other
   property setters.
@@ -276,7 +284,9 @@ Initial release, published to npm as `@voluma/three-transform-gizmo`.
   `latest`.
 - Ships ESM and CJS builds with TypeScript declarations for both.
 
-[Unreleased]: https://github.com/Voluma-ai/three-transform-gizmo/compare/v0.9.1...HEAD
+[Unreleased]: https://github.com/Voluma-ai/three-transform-gizmo/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/Voluma-ai/three-transform-gizmo/compare/v0.9.3...v1.0.0
+[0.9.3]: https://github.com/Voluma-ai/three-transform-gizmo/compare/v0.9.1...v0.9.3
 [0.9.1]: https://github.com/Voluma-ai/three-transform-gizmo/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/Voluma-ai/three-transform-gizmo/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/Voluma-ai/three-transform-gizmo/compare/v0.7.0...v0.8.0
