@@ -49,7 +49,7 @@ export class AngleSector extends Mesh<BufferGeometry, MeshBasicMaterial> {
   }
 
   /** angle in radians, signed; visual clamped to +-2PI */
-  update(angle: number): void {
+  update(angle: number, fine = false): void {
     const a = Math.max(-Math.PI * 2, Math.min(Math.PI * 2, angle))
     const segments = Math.max(1, Math.min(MAX_SEGMENTS, Math.ceil((Math.abs(a) / (Math.PI * 2)) * MAX_SEGMENTS)))
     const attr = this.geometry.getAttribute('position') as BufferAttribute
@@ -75,9 +75,9 @@ export class AngleSector extends Mesh<BufferGeometry, MeshBasicMaterial> {
     if (this.showLabel) {
       // degrees readout on the sector's bisector (full-circle degrees, signed)
       const deg = (angle * 180) / Math.PI
-      let text = deg.toFixed(1)
-      if (text.endsWith('.0')) text = text.slice(0, -2)
-      if (text === '-0') text = '0'
+      let text = deg.toFixed(fine ? 2 : 1)
+      if (!fine && text.endsWith('.0')) text = text.slice(0, -2)
+      if (Number(text) === 0) text = fine ? '0.00' : '0'
       this.label.setText(`${text}°`)
       const mid = a / 2
       this.label.position.set(Math.cos(mid) * r * LABEL_RADIUS, Math.sin(mid) * r * LABEL_RADIUS, 0)

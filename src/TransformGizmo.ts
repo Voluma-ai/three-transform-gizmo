@@ -52,6 +52,13 @@ interface DragState {
   parentScaleInv: Vector3
   rotationAxisWorld: Vector3
   sectorStartDir: Vector3
+  /** Raw and adjusted angles at the last Alt transition. */
+  rotationRawAnchor: number
+  rotationAngleAnchor: number
+  /** Last drag sample, used to change sensitivity without a jump. */
+  rotationLastRaw: number
+  rotationLastAngle: number
+  rotationFine: boolean
   localHalfExtents: Vector3
   localCenterOffset: Vector3
   handleDistanceWorld: number
@@ -1015,6 +1022,11 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
       parentScaleInv: new Vector3(1 / parentScale.x, 1 / parentScale.y, 1 / parentScale.z),
       rotationAxisWorld,
       sectorStartDir: _v2.copy(startPoint).sub(worldPositionStart).projectOnPlane(plane.normal).normalize().clone(),
+      rotationRawAnchor: 0,
+      rotationAngleAnchor: 0,
+      rotationLastRaw: 0,
+      rotationLastAngle: 0,
+      rotationFine: this._altKey,
       localHalfExtents,
       localCenterOffset,
       handleDistanceWorld,
@@ -1137,6 +1149,18 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
     return this.resolveSnap(this._rotationSnap, deg > 0 ? (deg * Math.PI) / 180 : 0)
   }
 
+  private adjustedRotationAngle(drag: DragState, raw: number): number {
+    if (drag.rotationFine !== this._altKey) {
+      drag.rotationRawAnchor = drag.rotationLastRaw
+      drag.rotationAngleAnchor = drag.rotationLastAngle
+      drag.rotationFine = this._altKey
+    }
+    const angle = drag.rotationAngleAnchor + (raw - drag.rotationRawAnchor) * (this._altKey ? 0.1 : 1)
+    drag.rotationLastRaw = raw
+    drag.rotationLastAngle = angle
+    return angle
+  }
+
   private activeScaleSnap(): number | null {
     return this.resolveSnap(this._scaleSnap, this._theme.snapping.temporaryScaleSnap)
   }
@@ -1209,7 +1233,7 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
       const n = drag.rotationAxisWorld.copy(offset).cross(this._eye)
       if (n.lengthSq() < 1e-12) return
       n.normalize()
-      let angle = offset.dot(_v3.copy(n).cross(this._eye)) * speed
+      let angle = this.adjustedRotationAngle(drag, offset.dot(_v3.copy(n).cross(this._eye)) * speed)
       angle = snapAngle(angle, snap)
       _q1.setFromAxisAngle(n, angle)
       object.quaternion
@@ -1224,7 +1248,7 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
     const v0 = _v2.copy(drag.startPoint).sub(drag.worldPositionStart).projectOnPlane(n)
     const v1 = _v3.copy(point).sub(drag.worldPositionStart).projectOnPlane(n)
     if (v0.lengthSq() < 1e-12 || v1.lengthSq() < 1e-12) return
-    let angle = Math.atan2(v0.clone().cross(v1).dot(n), v0.dot(v1))
+    let angle = this.adjustedRotationAngle(drag, Math.atan2(v0.clone().cross(v1).dot(n), v0.dot(v1)))
 
     // World X/Y/Z: snap absolute twist around the axis (preserves swing).
     // Local X/Y/Z and screen E: snap the angular delta from drag start.
@@ -1251,7 +1275,7 @@ export class TransformGizmo extends Object3D<GizmoEventMap & Object3DEventMap> {
     // re-orient every move: in local space the gizmo root rotates with the
     // object, so a one-shot orientation at pointerdown would drift
     this.orientSector()
-    this._sector.update(angle)
+    this._sector.update(angle, this._altKey)
   }
 
   private applyScale(drag: DragState, point: Vector3): void {
